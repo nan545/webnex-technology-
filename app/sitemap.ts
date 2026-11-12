@@ -1,0 +1,60 @@
+import type { MetadataRoute } from "next";
+import { siteConfig } from "@/config/site";
+import { industries } from "@/data/industries";
+import { articles } from "@/data/articles";
+import { caseStudies, projects } from "@/data/projects";
+import { services } from "@/data/services";
+import { readPublishedTeamMembers } from "@/server/content/team";
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const team = await readPublishedTeamMembers();
+  const routes = [
+    "",
+    "/about",
+    "/team",
+    "/services",
+    "/projects",
+    "/case-studies",
+    "/industries",
+    "/insights",
+    "/contact",
+  ];
+
+  return [
+    ...routes.map((route) => ({
+      url: new URL(route, siteConfig.url).toString(),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+    })),
+    ...services.map((service) => ({
+      url: new URL(`/services/${service.slug}`, siteConfig.url).toString(),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+    })),
+    ...industries.map((industry) => ({
+      url: new URL(`/industries/${industry.slug}`, siteConfig.url).toString(),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+    })),
+    ...projects.map((project) => ({
+      url: new URL(`/projects/${project.slug}`, siteConfig.url).toString(),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+    })),
+    ...caseStudies.map((caseStudy) => ({
+      url: new URL(`/case-studies/${caseStudy.slug}`, siteConfig.url).toString(),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+    })),
+    ...articles.map((article) => ({
+      url: new URL(`/insights/${article.slug}`, siteConfig.url).toString(),
+      lastModified: new Date(article.publishedAt),
+      changeFrequency: "monthly" as const,
+    })),
+    ...team.items.map((member) => ({
+      url: new URL(`/team/${member.slug}`, siteConfig.url).toString(),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+    })),
+  ];
+}

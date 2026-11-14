@@ -1,6 +1,8 @@
 import "server-only";
-import { ContentStatus, Prisma } from "@/generated/prisma/client";
+import { ContentStatus } from "@/generated/prisma/client";
+import { fallbackServices } from "@/data/fallback/services";
 import { cmsServiceContentSchema } from "@/lib/validation/cms-service";
+import { readWithDatabaseFallback } from "@/server/content/database-fallback";
 import { prisma } from "@/server/db";
 
 export async function listPublishedServicesForWebsite() {
@@ -9,6 +11,7 @@ export async function listPublishedServicesForWebsite() {
     orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
     select: { id: true, slug: true, title: true, summary: true, content: true, seoTitle: true, seoDescription: true },
   });
+  if (services.length === 0) return fallbackServices;
   return services.map((service) => ({
     ...service,
     content: parseServiceContent(service.id, service.content),
@@ -16,20 +19,21 @@ export async function listPublishedServicesForWebsite() {
 }
 
 export async function readPublishedServicesForPage() {
-  try {
-    return { items: await listPublishedServicesForWebsite(), unavailable: false as const };
-  } catch (error) {
-    if (
-      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-      !["P1000", "P1001", "P1002", "P1008", "P1017", "P2010"].includes(error.code)
-    ) {
-      throw error;
-    }
-    console.error("Published services could not be loaded from PostgreSQL", {
-      code: error.code,
-    });
-    return { items: [], unavailable: true as const };
-  }
+  const result = await readWithDatabaseFallback(
+    listPublishedServicesForWebsite,
+    () => fallbackServices,
+    "Published services",
+  );
+  return { items: result.value, unavailable: result.unavailable };
+}
+
+export async function readPublishedServiceForPage(slug: string) {
+  const result = await readWithDatabaseFallback(
+    () => getPublishedServiceForWebsite(slug),
+    () => ({ service: fallbackServices.find((service) => service.slug === slug) ?? null, redirectSlug: null }),
+    "Service details",
+  );
+  return { ...result.value, unavailable: result.unavailable };
 }
 
 export async function getPublishedServiceForWebsite(slug: string) {
@@ -49,6 +53,16 @@ export async function getPublishedServiceForWebsite(slug: string) {
     oldSlug.service.publishedAt <= new Date()
   ) {
     return { service: null, redirectSlug: oldSlug.service.slug };
+  }
+  const anyPublishedService = await prisma.service.findFirst({
+    where: { status: ContentStatus.PUBLISHED, publishedAt: { lte: new Date() } },
+    select: { id: true },
+  });
+  if (!anyPublishedService) {
+    return {
+      service: fallbackServices.find((item) => item.slug === slug) ?? null,
+      redirectSlug: null,
+    };
   }
   return { service: null, redirectSlug: null };
 }

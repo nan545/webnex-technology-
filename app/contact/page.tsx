@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
-import { Mail, MapPin, MessageSquareText } from "lucide-react";
+import { Mail, MapPin, MessageSquareText, Phone } from "lucide-react";
+import { BusinessWhatsAppLink } from "@/components/contact/business-whatsapp-link";
 import { EnquiryForm } from "@/components/contact/enquiry-form";
 import { Container } from "@/components/ui/container";
 import { PageHero } from "@/components/ui/page-hero";
 import { pageMetadata } from "@/lib/seo";
+import { readContactPhone } from "@/server/content/site-configuration";
 
 export const metadata: Metadata = pageMetadata(
   "Contact",
-  "Tell WEBNEX Technologies about your project. The enquiry form is prepared for a future backend integration.",
+  "Tell WEBNEX Technologies about your project using the enquiry form.",
   "/contact",
 );
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const phone = await readContactPhone();
   return (
     <>
       <PageHero
@@ -42,14 +45,23 @@ export default function ContactPage() {
                   Direct email details will be added after they are confirmed.
                 </span>
               </li>
+              {phone ? (
+                <li className="flex gap-3">
+                  <Phone aria-hidden="true" className="mt-0.5 shrink-0 text-blue-700" size={19} />
+                  <a className="text-sm leading-6 text-blue-700 hover:text-navy-950" href={`tel:${phone.replace(/[^\d+]/g, "")}`}>
+                    {phone}
+                  </a>
+                </li>
+              ) : null}
               <li className="flex gap-3">
                 <MessageSquareText aria-hidden="true" className="mt-0.5 shrink-0 text-blue-700" size={19} />
                 <span className="text-sm leading-6 text-muted">
-                  The project form is ready for the Phase 3 enquiry API; it
-                  does not currently store or deliver submissions.
+                  Enquiries are saved when the service is available. A confirmation
+                  appears after your submission has been saved.
                 </span>
               </li>
             </ul>
+            <BusinessWhatsAppLink />
           </aside>
           <div className="border border-border bg-white p-6 sm:p-8">
             <h2 className="text-xl font-semibold text-navy-950">
@@ -68,3 +80,5 @@ export default function ContactPage() {
     </>
   );
 }
+
+export const dynamic = "force-dynamic";

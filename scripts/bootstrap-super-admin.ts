@@ -76,7 +76,7 @@ async function main() {
   const passwordHash = await hash(password, 12);
   await prisma.$transaction(
     async (transaction) => {
-      await transaction.$queryRaw`SELECT pg_advisory_xact_lock(72340172838076673)`;
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(72340172838076673)`;
       const superAdminRole = await transaction.role.findUnique({
         where: { key: "SUPER_ADMIN" },
         select: { id: true },

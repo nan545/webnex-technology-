@@ -22,7 +22,7 @@ export default async function TeamPage() {
       />
       <section className="py-14 sm:py-18">
         <Container>
-          {team.unavailable ? (
+          {team.unavailable && !team.items.length ? (
             <p className="border border-border bg-white p-5 text-sm text-muted" role="status">
               Team profiles are temporarily unavailable. Please try again later.
             </p>

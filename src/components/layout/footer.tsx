@@ -3,14 +3,16 @@ import { ArrowUpRight } from "lucide-react";
 import { services } from "@/data/services";
 import { siteConfig } from "@/config/site";
 import { Container } from "@/components/ui/container";
+import { BrandLogo } from "@/components/layout/brand-logo";
+import type { NavigationConfiguration } from "@/lib/validation/site-configuration";
 
-export function Footer() {
+export function Footer({ links }: { links: NavigationConfiguration["footer"] }) {
   return (
     <footer className="border-t border-border bg-slate-50">
       <Container className="grid gap-12 py-14 md:grid-cols-[1.4fr_1fr_1fr] md:gap-16">
         <div>
-          <Link className="text-sm font-bold tracking-[0.14em] text-navy-950" href="/">
-            WEBNEX TECHNOLOGIES
+          <Link aria-label="WEBNEX Technologies home" className="inline-flex" href="/">
+            <BrandLogo />
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-6 text-muted">
             {siteConfig.tagline} Software engineering and technology solutions
@@ -22,7 +24,7 @@ export function Footer() {
             Explore
           </h2>
           <ul className="mt-4 space-y-3">
-            {siteConfig.navigation.slice(1).map((item) => (
+            {links.map((item) => (
               <li key={item.href}>
                 <Link
                   className="text-sm text-muted hover:text-blue-700"
@@ -32,16 +34,6 @@ export function Footer() {
                 </Link>
               </li>
             ))}
-            <li>
-              <Link className="text-sm text-muted hover:text-blue-700" href="/privacy">
-                Privacy
-              </Link>
-            </li>
-            <li>
-              <Link className="text-sm text-muted hover:text-blue-700" href="/terms">
-                Terms
-              </Link>
-            </li>
           </ul>
         </div>
         <div>

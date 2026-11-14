@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -15,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { IndustryCard } from "@/components/industries/industry-card";
 import { PublishedServiceCard } from "@/components/services/published-service-card";
+import { HeroIllustration } from "@/components/home/hero-illustration";
 import { siteConfig } from "@/config/site";
 import { industries } from "@/data/industries";
 import { pageMetadata } from "@/lib/seo";
@@ -58,9 +60,7 @@ const process = [
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
-  const serviceResult = await readPublishedServicesForPage();
-  const services = serviceResult.items;
+export default function Home() {
   return (
     <>
       <section className="relative overflow-hidden border-b border-border bg-white">
@@ -90,28 +90,7 @@ export default async function Home() {
               Engineering Digital Possibilities.
             </p>
           </div>
-          <div
-            aria-hidden="true"
-            className="relative mx-auto hidden aspect-square w-full max-w-[440px] items-center justify-center lg:flex"
-          >
-            <div className="absolute inset-8 border border-blue-100" />
-            <div className="absolute inset-16 border border-border" />
-            <div className="absolute inset-24 border border-blue-100" />
-            <div className="absolute left-1/2 top-8 h-[calc(100%-4rem)] w-px -translate-x-1/2 bg-border" />
-            <div className="absolute left-8 top-1/2 h-px w-[calc(100%-4rem)] -translate-y-1/2 bg-border" />
-            <div className="relative grid size-32 place-items-center border border-blue-700 bg-white text-4xl font-semibold tracking-[-0.08em] text-navy-950 shadow-[0_20px_70px_rgba(11,31,58,0.12)]">
-              W<span className="text-blue-700">N</span>
-            </div>
-            <div className="absolute right-7 top-16 bg-white px-3 py-2 text-xs font-semibold tracking-wide text-navy-800 shadow-sm">
-              Strategy
-            </div>
-            <div className="absolute bottom-16 left-2 bg-white px-3 py-2 text-xs font-semibold tracking-wide text-navy-800 shadow-sm">
-              Engineering
-            </div>
-            <div className="absolute bottom-8 right-7 bg-white px-3 py-2 text-xs font-semibold tracking-wide text-navy-800 shadow-sm">
-              Experience
-            </div>
-          </div>
+          <HeroIllustration />
         </Container>
         <div className="absolute bottom-8 right-8 hidden text-blue-700 lg:block">
           <ArrowDownRight aria-hidden="true" size={28} strokeWidth={1.4} />
@@ -156,24 +135,9 @@ export default async function Home() {
               All services <ArrowRight aria-hidden="true" size={16} />
             </Link>
           </div>
-          {services.length ? (
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {services.slice(0, 6).map((service) => (
-                <PublishedServiceCard key={service.id} service={service} />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-10">
-              <EmptyState
-                description={serviceResult.unavailable
-                  ? "Published service information is temporarily unavailable because the content database could not be reached."
-                  : "No services have been published yet."}
-                title={serviceResult.unavailable
-                  ? "Service information is temporarily unavailable"
-                  : "Service information is being prepared"}
-              />
-            </div>
-          )}
+          <Suspense fallback={<p className="mt-10 text-sm text-muted" role="status">Loading services...</p>}>
+            <HomeServices />
+          </Suspense>
         </Container>
       </section>
 
@@ -305,6 +269,28 @@ export default async function Home() {
 
       <CtaSection />
     </>
+  );
+}
+
+async function HomeServices() {
+  const serviceResult = await readPublishedServicesForPage();
+  return serviceResult.items.length ? (
+    <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {serviceResult.items.slice(0, 6).map((service) => (
+        <PublishedServiceCard key={service.id} service={service} />
+      ))}
+    </div>
+  ) : (
+    <div className="mt-10">
+      <EmptyState
+        description={serviceResult.unavailable
+          ? "Published service information is temporarily unavailable because the content database could not be reached."
+          : "No services have been published yet."}
+        title={serviceResult.unavailable
+          ? "Service information is temporarily unavailable"
+          : "Service information is being prepared"}
+      />
+    </div>
   );
 }
 

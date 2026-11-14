@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { AdminContext } from "@/server/auth/authorization";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
+import { DatabaseStatus } from "@/components/admin/database-status";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 const activeNavigation = [
   { href: "/admin", label: "Dashboard" },
@@ -14,6 +16,8 @@ const activeNavigation = [
   { href: "/admin/enquiries", label: "Enquiries", permission: "enquiries:read" },
   { href: "/admin/users", label: "Users and roles", permission: "users:manage" },
   { href: "/admin/audit-logs", label: "Audit logs", permission: "audit:read" },
+  { href: "/admin/navigation", label: "Navigation", permission: "content:publish" },
+  { href: "/admin/settings", label: "Settings", permission: "settings:manage" },
 ] as const;
 
 const navigationGroups = [
@@ -21,7 +25,6 @@ const navigationGroups = [
   { permission: "blog:manage", labels: ["Blog"] },
   { permission: "testimonials:manage", labels: ["Testimonials"] },
   { permission: "media:manage", labels: ["Media library"] },
-  { permission: "content:write", labels: ["Navigation", "Settings"] },
 ] as const;
 
 export function AdminShell({
@@ -34,9 +37,9 @@ export function AdminShell({
   return (
     <div className="min-h-screen bg-slate-50 text-navy-950 lg:grid lg:grid-cols-[250px_minmax(0,1fr)]">
       <aside className="border-b border-border bg-navy-950 text-white lg:min-h-screen lg:border-b-0 lg:border-r">
-        <Link className="flex min-h-[72px] items-center gap-3 border-b border-white/15 px-6 font-semibold tracking-wide" href="/admin">
-          <span className="grid size-9 place-items-center bg-blue-600 text-xs font-bold">WN</span>
-          <span>WEBNEX <span className="font-normal text-blue-200">ADMIN</span></span>
+        <Link aria-label="WEBNEX Technologies admin" className="flex min-h-[72px] items-center gap-3 border-b border-white/15 px-6" href="/admin">
+          <BrandLogo className="w-32" inverse />
+          <span className="text-xs font-medium tracking-wide text-blue-200">ADMIN</span>
         </Link>
         <nav aria-label="Administration" className="grid grid-cols-2 gap-1 p-3 sm:grid-cols-4 lg:block">
           <p className="hidden px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-200 lg:block">
@@ -82,7 +85,9 @@ export function AdminShell({
           </div>
           <AdminUserMenu name={admin.name ?? admin.email} />
         </header>
-        <main className="mx-auto w-full max-w-[1440px] p-5 sm:p-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1440px] p-5 sm:p-8">
+          <DatabaseStatus>{children}</DatabaseStatus>
+        </main>
       </div>
     </div>
   );

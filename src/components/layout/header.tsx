@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { services } from "@/data/services";
-import { siteConfig } from "@/config/site";
+import { BrandLogo } from "@/components/layout/brand-logo";
+import type { NavigationConfiguration } from "@/lib/validation/site-configuration";
 
-export function Header() {
+export function Header({ links }: { links: NavigationConfiguration["header"] }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
@@ -34,23 +35,15 @@ export function Header() {
       <div className="mx-auto flex min-h-[76px] w-full max-w-7xl items-center justify-between px-6 sm:px-10 lg:px-12">
         <Link
           aria-label="WEBNEX Technologies home"
-          className="flex items-center gap-2 text-sm font-bold tracking-[0.12em] text-navy-950"
+          className="inline-flex items-center"
           href="/"
           onClick={closeMenus}
         >
-          <span className="grid size-9 place-items-center bg-navy-950 text-xs font-bold tracking-normal text-white">
-            WN
-          </span>
-          <span>
-            WEBNEX
-            <span className="ml-1.5 font-normal tracking-normal text-muted">
-              TECHNOLOGIES
-            </span>
-          </span>
+          <BrandLogo />
         </Link>
 
         <nav aria-label="Main navigation" className="hidden items-center gap-7 lg:flex">
-          {siteConfig.navigation.slice(0, 2).map((item) => (
+          {links.slice(0, 2).map((item) => (
             <NavLink
               key={item.href}
               active={pathname === item.href}
@@ -92,7 +85,7 @@ export function Header() {
               </div>
             ) : null}
           </div>
-          {siteConfig.navigation.slice(2).map((item) => (
+          {links.slice(2).map((item) => (
             <NavLink
               key={item.href}
               active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
@@ -127,7 +120,7 @@ export function Header() {
           className="border-t border-border bg-white px-6 py-4 lg:hidden"
         >
           <div className="mx-auto flex max-w-7xl flex-col">
-            {siteConfig.navigation.slice(0, 2).map((item) => (
+            {links.slice(0, 2).map((item) => (
               <MobileNavLink
                 active={pathname === item.href}
                 href={item.href}
@@ -166,7 +159,7 @@ export function Header() {
                 ))}
               </div>
             ) : null}
-            {siteConfig.navigation.slice(2).map((item) => (
+            {links.slice(2).map((item) => (
               <MobileNavLink
                 active={
                   pathname === item.href || pathname.startsWith(`${item.href}/`)

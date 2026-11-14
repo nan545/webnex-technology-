@@ -1,13 +1,17 @@
 import "server-only";
 import { ContentStatus, Prisma } from "@/generated/prisma/client";
+import { fallbackTeamMembers } from "@/data/fallback/team";
 import { otherSocialLinkSchema } from "@/lib/validation/team-member";
+import { readWithDatabaseFallback } from "@/server/content/database-fallback";
 import { prisma } from "@/server/db";
 
-const publishedFilter = {
-  status: ContentStatus.PUBLISHED,
-  isActive: true,
-  publishedAt: { lte: new Date() },
-} as const;
+function publishedFilter() {
+  return {
+    status: ContentStatus.PUBLISHED,
+    isActive: true,
+    publishedAt: { lte: new Date() },
+  } as const;
+}
 
 const publicMemberSelect = {
   slug: true,
@@ -24,7 +28,7 @@ const publicMemberSelect = {
 
 export async function listPublishedTeamMembers(take?: number, skip = 0) {
   const records = await prisma.teamMember.findMany({
-    where: publishedFilter,
+    where: publishedFilter(),
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     ...(take === undefined ? {} : { take }),
     ...(take === undefined ? {} : { skip }),
@@ -34,47 +38,33 @@ export async function listPublishedTeamMembers(take?: number, skip = 0) {
 }
 
 export function countPublishedTeamMembers() {
-  return prisma.teamMember.count({ where: publishedFilter });
+  return prisma.teamMember.count({ where: publishedFilter() });
 }
 
 export async function getPublishedTeamMember(slug: string) {
   const member = await prisma.teamMember.findFirst({
-    where: { ...publishedFilter, slug },
+    where: { ...publishedFilter(), slug },
     select: publicMemberSelect,
   });
   return member ? toPublicMember(member) : null;
 }
 
 export async function readPublishedTeamMember(slug: string) {
-  try {
-    return { member: await getPublishedTeamMember(slug), unavailable: false as const };
-  } catch (error) {
-    if (
-      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-      !["P1000", "P1001", "P1002", "P1008", "P1017", "P2010", "P2021", "P2022"].includes(error.code)
-    ) {
-      throw error;
-    }
-    console.error("Team profile could not be loaded from PostgreSQL", { code: error.code });
-    return { member: null, unavailable: true as const };
-  }
+  const result = await readWithDatabaseFallback(
+    () => getPublishedTeamMember(slug),
+    () => fallbackTeamMembers.find((member) => member.slug === slug) ?? null,
+    "Team profile",
+  );
+  return { member: result.value, unavailable: result.unavailable };
 }
 
 export async function readPublishedTeamMembers() {
-  try {
-    return { items: await listPublishedTeamMembers(), unavailable: false as const };
-  } catch (error) {
-    if (
-      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-      !["P1000", "P1001", "P1002", "P1008", "P1017", "P2010", "P2021", "P2022"].includes(error.code)
-    ) {
-      throw error;
-    }
-    console.error("Published team members could not be loaded from PostgreSQL", {
-      code: error.code,
-    });
-    return { items: [], unavailable: true as const };
-  }
+  const result = await readWithDatabaseFallback(
+    () => listPublishedTeamMembers(),
+    () => fallbackTeamMembers,
+    "Published team members",
+  );
+  return { items: result.value, unavailable: result.unavailable };
 }
 
 function toPublicMember(member: {

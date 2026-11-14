@@ -8,7 +8,10 @@ const globalForPrisma = globalThis as typeof globalThis & {
 };
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
+  const adapter = new PrismaPg({
+    connectionString: env.DATABASE_URL,
+    connectionTimeoutMillis: 5_000,
+  });
   return new PrismaClient({ adapter });
 }
 

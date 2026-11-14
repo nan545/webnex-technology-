@@ -15,3 +15,12 @@ export function createWhatsAppLink(phone: string, message: string) {
   if (!number) return null;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
+
+export function createBusinessWhatsAppLink(
+  phone: string | undefined,
+  message: string,
+) {
+  const internationalNumber = phone?.trim();
+  if (!internationalNumber?.startsWith("+")) return null;
+  return createWhatsAppLink(internationalNumber, message);
+}

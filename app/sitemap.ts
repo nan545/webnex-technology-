@@ -3,11 +3,16 @@ import { siteConfig } from "@/config/site";
 import { industries } from "@/data/industries";
 import { articles } from "@/data/articles";
 import { caseStudies, projects } from "@/data/projects";
-import { services } from "@/data/services";
+import { readPublishedServicesForPage } from "@/server/content/services";
 import { readPublishedTeamMembers } from "@/server/content/team";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const team = await readPublishedTeamMembers();
+  const [team, services] = await Promise.all([
+    readPublishedTeamMembers(),
+    readPublishedServicesForPage(),
+  ]);
   const routes = [
     "",
     "/about",
@@ -26,7 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: "monthly" as const,
     })),
-    ...services.map((service) => ({
+    ...services.items.map((service) => ({
       url: new URL(`/services/${service.slug}`, siteConfig.url).toString(),
       lastModified: new Date(),
       changeFrequency: "monthly" as const,

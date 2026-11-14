@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHero } from "@/components/ui/page-hero";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { pageMetadata } from "@/lib/seo";
-import { getPublishedServiceForWebsite, listPublishedServicesForWebsite } from "@/server/content/services";
+import { readPublishedServiceForPage, readPublishedServicesForPage } from "@/server/content/services";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,8 @@ export async function generateMetadata({
   params,
 }: PageProps<"/services/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const { service } = await getPublishedServiceForWebsite(slug);
+  const { service, unavailable } = await readPublishedServiceForPage(slug);
+  if (unavailable && !service) return { title: "Service temporarily unavailable", robots: { index: false, follow: true } };
   if (!service) return { title: "Service not found" };
   return pageMetadata(
     service.seoTitle ?? service.title,
@@ -31,13 +32,29 @@ export default async function ServiceDetailPage({
   params,
 }: PageProps<"/services/[slug]">) {
   const { slug } = await params;
-  const result = await getPublishedServiceForWebsite(slug);
+  const result = await readPublishedServiceForPage(slug);
+  if (result.unavailable && !result.service) {
+    return (
+      <section className="py-16 sm:py-20">
+        <Container>
+          <EmptyState
+            title="Service information is temporarily unavailable"
+            description="We cannot load this service right now. Please try again later."
+          />
+          <Link className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-blue-700 hover:text-navy-950" href="/services">
+            <ArrowLeft aria-hidden="true" size={15} /> All services
+          </Link>
+        </Container>
+      </section>
+    );
+  }
   if (result.redirectSlug) permanentRedirect(`/services/${result.redirectSlug}`);
   const service = result.service;
   if (!service) notFound();
 
   const content = service.content;
-  const related = (await listPublishedServicesForWebsite())
+  const relatedResult = await readPublishedServicesForPage();
+  const related = relatedResult.items
     .filter((item) => item.slug !== service.slug)
     .slice(0, 3);
 
@@ -132,8 +149,12 @@ export default async function ServiceDetailPage({
           ) : (
             <div className="mt-8">
               <EmptyState
-                description="Additional service information will be published here when ready."
-                title="More services are being prepared"
+                description={relatedResult.unavailable
+                  ? "Related service information is temporarily unavailable."
+                  : "Additional service information will be published here when ready."}
+                title={relatedResult.unavailable
+                  ? "Related services are temporarily unavailable"
+                  : "More services are being prepared"}
               />
             </div>
           )}

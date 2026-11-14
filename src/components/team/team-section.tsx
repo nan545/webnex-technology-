@@ -30,7 +30,7 @@ export function TeamSection({
             </Link>
           ) : null}
         </div>
-        {unavailable ? (
+        {unavailable && !members.length ? (
           <p className="mt-8 border border-border bg-white p-5 text-sm text-muted" role="status">
             Team profiles are temporarily unavailable. Please try again later.
           </p>

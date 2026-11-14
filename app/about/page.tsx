@@ -9,6 +9,8 @@ import { TeamSection } from "@/components/team/team-section";
 import { pageMetadata } from "@/lib/seo";
 import { readPublishedTeamMembers } from "@/server/content/team";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = pageMetadata(
   "About",
   "Learn about WEBNEX Technologies and our approach to software engineering and digital solutions.",

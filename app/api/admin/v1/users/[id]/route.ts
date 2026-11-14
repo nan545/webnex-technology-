@@ -48,7 +48,7 @@ export async function PATCH(
   try {
     const user = await prisma.$transaction(
       async (transaction) => {
-        await transaction.$queryRaw`SELECT pg_advisory_xact_lock(72340172838076673)`;
+        await transaction.$executeRaw`SELECT pg_advisory_xact_lock(72340172838076673)`;
         const existing = await transaction.user.findUnique({
           where: { id },
           select: {

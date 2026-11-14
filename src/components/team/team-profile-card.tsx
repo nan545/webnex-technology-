@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { BriefcaseBusiness, Code2, Link as LinkIcon } from "lucide-react";
 import type { OtherSocialLink } from "@/lib/validation/team-member";
+import { ProfilePhoto } from "@/components/team/profile-photo";
 
 export type PublicTeamMember = {
   slug: string;
@@ -25,20 +25,11 @@ export function TeamProfileCard({ member }: { member: PublicTeamMember }) {
         className="group relative block aspect-[4/5] overflow-hidden bg-slate-100"
         href={`/team/${member.slug}`}
       >
-        {member.profileImageUrl ? (
-          <Image
-            alt={member.profileImageAlt || `Portrait of ${member.name}`}
-            className="object-cover transition-transform duration-300 group-hover:scale-[1.025]"
-            fill
-            sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 30vw"
-            src={member.profileImageUrl}
-            unoptimized
-          />
-        ) : (
-          <div className="grid size-full place-items-center border-b border-border text-sm text-muted">
-            Profile photo not provided
-          </div>
-        )}
+        <ProfilePhoto
+          alt={member.profileImageAlt || `Portrait of ${member.name}`}
+          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 30vw"
+          src={member.profileImageUrl}
+        />
       </Link>
       <div className="flex flex-1 flex-col p-5 sm:p-6">
         <p className="text-sm font-semibold text-blue-700">{member.title}</p>

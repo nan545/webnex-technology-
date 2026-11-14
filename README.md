@@ -10,7 +10,7 @@ The project establishes the Next.js application, PostgreSQL/Prisma schema, publi
 
 ## Requirements
 
-- Node.js 20.9 or later (Node.js 24 is used for the current development setup).
+- Node.js 20.19+, 22.12+, or 24+ (Node.js 24 is used for the current development setup; odd-numbered releases below 24 are not supported by Prisma).
 - npm.
 - PostgreSQL 16 or later, running locally or reachable through a private/secured connection.
 - Git.
@@ -58,12 +58,14 @@ npm run admin:bootstrap
 npm run db:check
 ```
 
-- `db:generate` generates the Prisma client without connecting to PostgreSQL.
+- `db:generate` generates the Prisma client without connecting to PostgreSQL or requiring `DATABASE_URL`; installation also runs it automatically.
 - `db:migrate` creates/applies a development migration and requires a reachable disposable development database.
 - `db:seed` inserts the `SUPER_ADMIN`, `ADMIN`, `EDITOR`, and `SALES` role definitions and permission mappings. It does not create user accounts or sample company content.
 - `admin:bootstrap` is an interactive one-time CLI that creates the first Super Admin; it requires migrations and role seed to be applied. Password input is hidden, 12–72 UTF-8 bytes, and never passed as a command-line argument. It refuses to run when an active Super Admin already exists.
 - `db:check` runs a real `SELECT 1` connectivity check.
 - `db:deploy` applies committed migrations in a deployment environment.
+
+For deployment, configure a real hosted PostgreSQL `DATABASE_URL` as a secret for migrations and the running application; the local database is not reachable from a cloud build. Prisma generation during dependency installation does not need database credentials. Application builds that evaluate database-backed pages may also require the deployment environment configuration.
 
 The migration history includes the Phase 1 baseline and additive Phase 3/Phase 4/Phase 5 migrations. A PostgreSQL 16 service is running locally on port 5432, but the connection check could not authenticate because valid credentials were not provided. **No migration history has been confirmed against a live database in this environment.** Apply only to a dedicated development database and review every migration first. Never use reset commands against production data.
 

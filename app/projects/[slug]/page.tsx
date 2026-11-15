@@ -6,18 +6,17 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { Container } from "@/components/ui/container";
 import { CtaSection } from "@/components/ui/cta-section";
 import { PageHero } from "@/components/ui/page-hero";
-import { getProject, projects } from "@/data/projects";
+import { readWebsiteProjects } from "@/server/content/website-publications";
 import { pageMetadata } from "@/lib/seo";
 
-export function generateStaticParams() {
-  return projects.map(({ slug }) => ({ slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
 }: PageProps<"/projects/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const project = getProject(slug);
+  const { items } = await readWebsiteProjects();
+  const project = items.find((item) => item.slug === slug);
   if (!project) return { title: "Project not found" };
   return pageMetadata(
     project.title,
@@ -30,7 +29,9 @@ export default async function ProjectDetailPage({
   params,
 }: PageProps<"/projects/[slug]">) {
   const { slug } = await params;
-  const project = getProject(slug);
+  const { items, unavailable } = await readWebsiteProjects();
+  if (unavailable) throw new Error("Projects are temporarily unavailable.");
+  const project = items.find((item) => item.slug === slug);
   if (!project) notFound();
 
   return (
@@ -49,6 +50,7 @@ export default async function ProjectDetailPage({
               height={675}
               sizes="(max-width: 768px) 100vw, 896px"
               src={project.image.src}
+              unoptimized
               width={1200}
             />
           ) : null}

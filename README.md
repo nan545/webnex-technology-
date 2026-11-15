@@ -121,7 +121,13 @@ Team fallback profiles are explicitly listed in `src/data/fallback/team.ts` and 
 
 The additive `20261111110000_phase5_services_cms` migration expands content workflow states and adds service revision history, updater tracking, scheduling timestamp storage, and service slug redirects. **It has not been applied** because PostgreSQL authentication is unavailable. Re-run `npm run db:generate` after schema changes, then use the database setup commands above against a dedicated development database.
 
-Not implemented: CMS editors for homepage/about sections, projects, case studies, industries, blog, categories/tags, testimonials, other global settings, full SEO controls, and a general media library. Team profiles are implemented as a separate CMS workflow below. There is no scheduled-publishing worker; `SCHEDULED` is not accepted by the Services workflow. Service CRUD, revisions, RBAC boundaries, database migration, and public database rendering still need integration tests against an isolated PostgreSQL database.
+Not implemented: CMS editors for homepage/about sections, case studies, industries, categories/tags, testimonials, other global settings, full SEO controls, and a general media library. Project and insight publishing and team profiles are separate workflows described below. There is no scheduled-publishing worker; `SCHEDULED` is not accepted by the Services workflow. Service CRUD, revisions, RBAC boundaries, database migration, and public database rendering still need integration tests against an isolated PostgreSQL database.
+
+### Projects and insights
+
+Administrators with `projects:manage` or `blog:manage` can create and edit drafts under **Projects** or **Insights**. Publication, unpublishing, and changes to published content or its cover require `content:publish`. Save a record first, then optionally upload a JPG, PNG, or WebP cover and a description. Images use the private object-storage configuration described below; uploads are limited to 5 MB and converted to WebP. Published content appears on its public listing, detail page and sitemap; published projects can also appear on the homepage. Previously published URL slugs cannot be changed. The editor supports paragraphs separated by blank lines, not rich text, scheduling, deletion, or revisions.
+
+Apply the `20261115140000_publication_cover_images` migration before deploying code that reads the new image relationships. Review and back up the target database first. Existing records with unsupported content formats or workflow statuses are listed in the admin interface for manual review and are not editable there. Published records with unsupported content are omitted from the new public pages and logged; their data is not changed. Review these records before deployment. Draft cover images are not publicly accessible.
 
 ## Phase 3 API
 
@@ -142,7 +148,7 @@ Successful responses use `{ "data": ..., "meta": { "requestId": "..." } }`. Erro
 | `GET /api/v1/site-settings` | Settings explicitly marked public. |
 | `POST /api/v1/enquiries` | Validates and stores project enquiries; see workflow below. |
 
-The public services listing and detail routes read published PostgreSQL service records as described in Phase 5. Public navigation uses the separate site configuration described below; most other public industry and editorial UI still uses Phase 2 typed content modules and is **not yet hydrated from these APIs/database records**. No production/sample content has been seeded.
+Public services, projects and insights pages read published PostgreSQL records. Public navigation uses the separate site configuration described below; other public content may still use Phase 2 typed content modules. No production/sample content has been seeded.
 
 ## Enquiry workflow
 

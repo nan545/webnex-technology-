@@ -1,17 +1,19 @@
 import type { MetadataRoute } from "next";
 import { siteConfig } from "@/config/site";
 import { industries } from "@/data/industries";
-import { articles } from "@/data/articles";
-import { caseStudies, projects } from "@/data/projects";
+import { caseStudies } from "@/data/projects";
 import { readPublishedServicesForPage } from "@/server/content/services";
 import { readPublishedTeamMembers } from "@/server/content/team";
+import { readWebsiteInsights, readWebsiteProjects } from "@/server/content/website-publications";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [team, services] = await Promise.all([
+  const [team, services, projectResults, insightResults] = await Promise.all([
     readPublishedTeamMembers(),
     readPublishedServicesForPage(),
+    readWebsiteProjects(),
+    readWebsiteInsights(),
   ]);
   const routes = [
     "",
@@ -41,7 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: "monthly" as const,
     })),
-    ...projects.map((project) => ({
+    ...projectResults.items.map((project) => ({
       url: new URL(`/projects/${project.slug}`, siteConfig.url).toString(),
       lastModified: new Date(),
       changeFrequency: "monthly" as const,
@@ -51,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: "monthly" as const,
     })),
-    ...articles.map((article) => ({
+    ...insightResults.items.map((article) => ({
       url: new URL(`/insights/${article.slug}`, siteConfig.url).toString(),
       lastModified: new Date(article.publishedAt),
       changeFrequency: "monthly" as const,

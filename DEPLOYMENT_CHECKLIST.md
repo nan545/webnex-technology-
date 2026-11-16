@@ -1,13 +1,13 @@
 # Deployment Checklist
 
-**Status:** Not deployment-approved. The selected Hostinger plan and production domain have not been confirmed.
+**Status:** Not deployment-approved. Render is the selected hosting target; the service plan, database setup and production domain have not been confirmed.
 
 ## Hosting and architecture
 
-- [ ] Confirm the exact Hostinger plan supports a persistent Next.js Node.js runtime and the project's required Node.js version (currently Node.js 20.9+; local verification used v24.19.0).
+- [ ] Confirm the Render web service supports the project's required Node.js version (currently Node.js 20.19+; local verification used v24.19.0).
 - [ ] Confirm secure PostgreSQL connectivity from that runtime, connection limits/pooling, TLS and migration execution.
 - [ ] Confirm support for environment variables, HTTPS, deployment workflow, webhook ingress and scheduled/background workers.
-- [ ] Confirm persistent object storage for future media uploads; local filesystem persistence is not assumed.
+- [ ] Attach a paid Render persistent disk mounted at `/var/data`; set `OBJECT_STORAGE_DRIVER=filesystem` and `OBJECT_STORAGE_FILESYSTEM_PATH=/var/data/webnex-media`. Keep the service at one instance and verify the disk's backup/recovery plan, or configure a private S3-compatible bucket instead.
 - [ ] If shared hosting cannot meet runtime/database/worker requirements, select a compatible VPS or managed application/database hosting. Do not deploy based on shared-hosting assumptions.
 - [ ] Confirm the `.com` domain and final canonical HTTPS origin.
 

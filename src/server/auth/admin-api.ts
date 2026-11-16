@@ -9,6 +9,7 @@ export async function authorizeAdmin(permission: string) {
       response: apiError(401, "UNAUTHENTICATED", "Administrator sign-in is required."),
     };
   }
+
   if (!admin.permissions.has(permission)) {
     return {
       admin: null,
@@ -16,4 +17,16 @@ export async function authorizeAdmin(permission: string) {
     };
   }
   return { admin, response: null };
+}
+
+export async function authorizeSuperAdmin(permission: string) {
+  const authorization = await authorizeAdmin(permission);
+  if (authorization.response) return authorization;
+  if (!authorization.admin.roles.includes("SUPER_ADMIN")) {
+    return {
+      admin: null,
+      response: apiError(403, "FORBIDDEN", "Only a Super Admin can manage users and roles."),
+    };
+  }
+  return authorization;
 }

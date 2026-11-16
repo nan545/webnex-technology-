@@ -304,14 +304,17 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   publishedAt DateTime?
+  coverImageId String?      @db.Uuid
 
   createdBy User?            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  coverImage MediaAsset?     @relation("ProjectCoverImage", fields: [coverImageId], references: [id], onDelete: SetNull)
   industry  Industry?        @relation(fields: [industryId], references: [id], onDelete: SetNull)
   services  ProjectService[]
   caseStudy CaseStudy?
 
   @@index([status, publishedAt])
   @@index([industryId, status, publishedAt])
+  @@index([coverImageId])
 }
 
 model Industry {
@@ -426,13 +429,16 @@ model BlogPost {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   publishedAt    DateTime?
+  coverImageId   String?       @db.Uuid
 
   author     User?              @relation("BlogPostAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  coverImage MediaAsset?        @relation("BlogPostCoverImage", fields: [coverImageId], references: [id], onDelete: SetNull)
   categories BlogPostCategory[]
   tags       BlogPostTag[]
 
   @@index([status, publishedAt])
   @@index([authorId])
+  @@index([coverImageId])
 }
 
 model Category {
@@ -499,6 +505,8 @@ model MediaAsset {
 
   uploadedBy  User?        @relation("MediaUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
   teamMembers TeamMember[] @relation("TeamMemberProfileImage")
+  projectCovers Project[] @relation("ProjectCoverImage")
+  blogPostCovers BlogPost[] @relation("BlogPostCoverImage")
 
   @@index([uploadedById, createdAt])
   @@index([mimeType])

@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { requireAdminPage } from "@/server/auth/admin-page";
 import { Prisma } from "@/generated/prisma/client";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Users and roles" };
 
@@ -12,6 +13,7 @@ export default async function AdminUsersPage({
   searchParams: Promise<{ page?: string; q?: string }>;
 }) {
   const admin = await requireAdminPage("users:manage");
+  if (!admin.roles.includes("SUPER_ADMIN")) redirect("/admin/unauthorized");
   const params = await searchParams;
   const query = params.q?.trim().slice(0, 100) ?? "";
   const requestedPage = Number(params.page ?? "1");
@@ -27,7 +29,7 @@ export default async function AdminUsersPage({
         ],
       }
     : {};
-  const [users, totalItems] = await prisma.$transaction([
+  const [users, totalItems, roles] = await prisma.$transaction([
     prisma.user.findMany({
       where,
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
@@ -44,6 +46,9 @@ export default async function AdminUsersPage({
       },
     }),
     prisma.user.count({ where }),
+    prisma.role.findMany({
+      select: { key: true, name: true },
+    }),
   ]);
   const totalPages = Math.ceil(totalItems / pageSize);
 
@@ -64,6 +69,7 @@ export default async function AdminUsersPage({
       <p className="text-sm text-muted">{totalItems.toLocaleString("en")} matching accounts</p>
       <UserManagement
         currentUserId={admin.id}
+        roles={roles.map(({ key, name }) => ({ key, name }))}
         users={users.map((user) => ({
           id: user.id,
           name: user.name,
@@ -84,8 +90,8 @@ export default async function AdminUsersPage({
         </nav>
       ) : null}
       <p className="text-xs leading-5 text-muted">
-        Password reset is unavailable until an email provider is selected. Accounts are created with
-        an initial password and must be provided with it securely outside this application.
+        Super Admins can reset another active administrator&apos;s password. Passwords must be shared
+        securely outside this application; self-service password reset is not available.
       </p>
     </div>
   );

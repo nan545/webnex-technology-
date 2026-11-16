@@ -1,7 +1,9 @@
 import { Prisma } from "@/generated/prisma/client";
 import { z } from "zod";
+import { roleKeySchema } from "@/lib/validation/roles";
+import { readBoundedJson } from "@/server/api/bounded-json";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
-import { authorizeAdmin } from "@/server/auth/admin-api";
+import { authorizeSuperAdmin } from "@/server/auth/admin-api";
 import { prisma } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
@@ -9,7 +11,7 @@ const updateSchema = z
   .object({
     name: z.string().trim().min(2).max(120).optional(),
     isActive: z.boolean().optional(),
-    roleKey: z.enum(["SUPER_ADMIN", "ADMIN", "EDITOR", "SALES"]).optional(),
+    roleKey: roleKeySchema.optional(),
   })
   .refine((value) => Object.keys(value).length > 0);
 
@@ -19,18 +21,14 @@ export async function PATCH(
 ) {
   const originError = rejectCrossOriginMutation(request);
   if (originError) return originError;
-  const authorization = await authorizeAdmin("users:manage");
+  const authorization = await authorizeSuperAdmin("users:manage");
   if (authorization.response) return authorization.response;
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return apiError(404, "NOT_FOUND", "Administrator was not found.");
 
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return apiError(400, "INVALID_JSON", "The request body must be valid JSON.");
-  }
-  const input = updateSchema.safeParse(rawBody);
+  const body = await readBoundedJson(request);
+  if (body.error) return body.error;
+  const input = updateSchema.safeParse(body.value);
   if (!input.success) return apiError(422, "VALIDATION_FAILED", "Administrator changes are invalid.");
   if (
     id === authorization.admin!.id &&
@@ -62,8 +60,9 @@ export async function PATCH(
         if (!existing) return null;
 
         const currentRole = existing.roles[0]?.role;
+        const hasSuperAdminRole = existing.roles.some(({ role }) => role.key === "SUPER_ADMIN");
         const changesSuperAdmin =
-          currentRole?.key === "SUPER_ADMIN" &&
+          hasSuperAdminRole &&
           (input.data.roleKey !== undefined && input.data.roleKey !== "SUPER_ADMIN" ||
             input.data.isActive === false);
 

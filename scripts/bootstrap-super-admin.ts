@@ -1,51 +1,14 @@
 import "dotenv/config";
-import { emitKeypressEvents } from "node:readline";
-import { createInterface } from "node:readline/promises";
 import { hash } from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { env } from "../src/server/env";
 import { z } from "zod";
+import { prompt, promptPassword } from "./interactive-input";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
 });
-
-function prompt(label: string) {
-  const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  return terminal.question(label).finally(() => terminal.close());
-}
-
-async function promptPassword(label: string) {
-  if (!process.stdin.isTTY || !process.stdin.setRawMode) {
-    throw new Error("Run this command from an interactive terminal.");
-  }
-  process.stdout.write(label);
-  emitKeypressEvents(process.stdin);
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-
-  return new Promise<string>((resolve, reject) => {
-    let value = "";
-    const onKeypress = (text: string, key: { name?: string; ctrl?: boolean }) => {
-      if (key.ctrl && key.name === "c") {
-        process.stdin.off("keypress", onKeypress);
-        process.stdin.setRawMode(false);
-        reject(new Error("Bootstrap cancelled."));
-      } else if (key.name === "return" || key.name === "enter") {
-        process.stdin.off("keypress", onKeypress);
-        process.stdin.setRawMode(false);
-        process.stdout.write("\n");
-        resolve(value);
-      } else if (key.name === "backspace") {
-        value = value.slice(0, -1);
-      } else if (!key.ctrl && text && text.length === 1 && text >= " ") {
-        value += text;
-      }
-    };
-    process.stdin.on("keypress", onKeypress);
-  });
-}
 
 async function main() {
   if (!process.stdin.isTTY) {
@@ -117,7 +80,7 @@ async function main() {
         },
       });
     },
-    { isolationLevel: "Serializable" },
+    { isolationLevel: "Serializable", maxWait: 20_000, timeout: 30_000 },
   );
   console.log("The initial Super Admin account was created.");
 }

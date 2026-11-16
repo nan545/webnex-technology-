@@ -46,6 +46,7 @@ export function ProjectGrid({ projects }: { projects: Project[] }) {
                 height={675}
                 sizes="(max-width: 768px) 100vw, 33vw"
                 src={project.image.src}
+                unoptimized
                 width={1200}
               />
             ) : null}

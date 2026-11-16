@@ -26,6 +26,14 @@ const environmentSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  OBJECT_STORAGE_DRIVER: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.enum(["s3", "filesystem"]).default("s3"),
+  ),
+  OBJECT_STORAGE_FILESYSTEM_PATH: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1).optional(),
+  ),
   OBJECT_STORAGE_ENDPOINT: z.preprocess(
     (value) => value === "" ? undefined : value,
     z.string().url().optional(),

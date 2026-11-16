@@ -182,7 +182,7 @@ async function loadDashboard() {
         ? prisma.user.count({
             where: {
               isActive: true,
-              roles: { some: { role: { key: { in: ["SUPER_ADMIN", "ADMIN", "EDITOR"] } } } },
+              roles: { some: {} },
             },
           })
         : Promise.resolve(null),

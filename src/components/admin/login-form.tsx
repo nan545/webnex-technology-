@@ -79,7 +79,7 @@ export function AdminLoginForm() {
         {submitting ? "Signing in…" : "Sign in"}
       </button>
       <p className="text-xs leading-5 text-muted">
-        Password reset is unavailable until an email provider is configured.
+        Self-service password reset is unavailable.
         Contact your system administrator.
       </p>
     </form>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { errorMessage } from "@/lib/api/error-message";
 
 type AdminUserRow = {
   id: string;
@@ -13,23 +14,70 @@ type AdminUserRow = {
   roleKey: string;
 };
 
-const roleOptions = ["SUPER_ADMIN", "ADMIN", "EDITOR", "SALES"];
+const builtInRoleKeys = ["SUPER_ADMIN", "ADMIN", "EDITOR", "SALES"];
 
 export function UserManagement({
   users,
   currentUserId,
+  roles,
 }: {
   users: AdminUserRow[];
   currentUserId: string;
+  roles: Array<{ key: string; name: string }>;
 }) {
   const router = useRouter();
+  const roleOptions = [...roles].sort((a, b) => {
+    const aIndex = builtInRoleKeys.indexOf(a.key);
+    const bIndex = builtInRoleKeys.indexOf(b.key);
+    if (aIndex !== -1 || bIndex !== -1) return (aIndex === -1 ? 4 : aIndex) - (bIndex === -1 ? 4 : bIndex);
+    return a.name.localeCompare(b.name);
+  });
+  const roleLabel = (role: { key: string; name: string }) =>
+    builtInRoleKeys.includes(role.key) ? role.key.replaceAll("_", " ") : role.name;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [roleKey, setRoleKey] = useState("EDITOR");
+  const [roleKey, setRoleKey] = useState(roles.find((role) => role.key === "EDITOR")?.key ?? "");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [resetUser, setResetUser] = useState<AdminUserRow | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  function closeReset() {
+    setResetUser(null);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  }
+  async function resetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!resetUser) return;
+    setError("");
+    setMessage("");
+    if (newPassword !== confirmPassword) {
+      setError("The new passwords do not match.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/admin/v1/users/${resetUser.id}/password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      closeReset();
+      setMessage("Password reset. Share the new password securely; the administrator must sign in again.");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to reset the password.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,14 +141,15 @@ export function UserManagement({
           <input className="field-control" autoComplete="email" id="new-admin-email" maxLength={254} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
         </div>
         <div>
-          <label className="field-label" htmlFor="new-admin-password">Temporary password</label>
+          <label className="field-label" htmlFor="new-admin-password">Initial password</label>
           <input className="field-control" autoComplete="new-password" id="new-admin-password" maxLength={72} minLength={12} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />
-          <p className="mt-1 text-xs text-muted">12–72 characters. Share it through a separate secure channel.</p>
+          <p className="mt-1 text-xs text-muted">12–72 UTF-8 bytes. Share it securely; self-service password changes are not yet available.</p>
         </div>
         <div>
           <label className="field-label" htmlFor="new-admin-role">Role</label>
-          <select className="field-control" id="new-admin-role" onChange={(event) => setRoleKey(event.target.value)} value={roleKey}>
-            {roleOptions.map((role) => <option key={role} value={role}>{role.replaceAll("_", " ")}</option>)}
+          <select className="field-control" id="new-admin-role" onChange={(event) => setRoleKey(event.target.value)} required value={roleKey}>
+            {!roleKey ? <option value="">Select a role</option> : null}
+            {roleOptions.map((role) => <option key={role.key} value={role.key}>{roleLabel(role)}</option>)}
           </select>
         </div>
         <div className="sm:col-span-2">
@@ -141,7 +190,7 @@ export function UserManagement({
                         value={user.roleKey}
                       >
                         {!user.roleKey ? <option value="">No role assigned</option> : null}
-                        {roleOptions.map((role) => <option key={role} value={role}>{role.replaceAll("_", " ")}</option>)}
+                        {roleOptions.map((role) => <option key={role.key} value={role.key}>{roleLabel(role)}</option>)}
                       </select>
                     </td>
                     <td className="px-4 py-4">{user.isActive ? "Active" : "Disabled"}</td>
@@ -150,6 +199,7 @@ export function UserManagement({
                       {user.id === currentUserId ? (
                         <span className="text-xs text-muted">Current account</span>
                       ) : (
+                        <div className="flex flex-wrap gap-2">
                         <button
                           className="min-h-10 border border-border px-3 text-xs font-medium hover:border-blue-700 hover:text-blue-700"
                           disabled={saving}
@@ -158,6 +208,13 @@ export function UserManagement({
                         >
                           {user.isActive ? "Deactivate" : "Activate"}
                         </button>
+                        {user.isActive ? <button
+                          className="min-h-10 border border-border px-3 text-xs font-medium hover:border-blue-700 hover:text-blue-700"
+                          disabled={saving}
+                          onClick={() => { closeReset(); setError(""); setMessage(""); setResetUser(user); }}
+                          type="button"
+                        >Reset password</button> : null}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -169,6 +226,31 @@ export function UserManagement({
           <p className="px-5 py-10 text-sm text-muted">No administrator accounts found.</p>
         )}
       </section>
+      {resetUser ? (
+        <form className="grid gap-4 border border-border bg-white p-5 sm:grid-cols-2 sm:p-7" onSubmit={resetPassword}>
+          <div className="sm:col-span-2">
+            <h2 className="font-semibold">Reset password for {resetUser.name || resetUser.email}</h2>
+            <p className="mt-1 text-sm text-muted">This clears login lockout and signs out their existing sessions. Share the new password securely.</p>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="reset-current-password">Your Super Admin password</label>
+            <input autoComplete="current-password" className="field-control" id="reset-current-password" maxLength={72} onChange={(event) => setCurrentPassword(event.target.value)} required type="password" value={currentPassword} />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="reset-new-password">New password</label>
+            <input autoComplete="new-password" className="field-control" id="reset-new-password" maxLength={72} minLength={12} onChange={(event) => setNewPassword(event.target.value)} required type="password" value={newPassword} />
+            <p className="mt-1 text-xs text-muted">12–72 UTF-8 bytes.</p>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="reset-confirm-password">Confirm new password</label>
+            <input autoComplete="new-password" className="field-control" id="reset-confirm-password" maxLength={72} minLength={12} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} />
+          </div>
+          <div className="flex flex-wrap gap-3 sm:col-span-2">
+            <button className="button-primary" disabled={saving} type="submit">{saving ? "Resetting…" : "Confirm password reset"}</button>
+            <button className="button-secondary" disabled={saving} onClick={() => { closeReset(); setError(""); }} type="button">Cancel</button>
+          </div>
+        </form>
+      ) : null}
       <div aria-live="polite" className="min-h-6">
         {error ? <p className="text-sm text-red-800" role="alert">{error}</p> : null}
         {message ? <p className="text-sm text-green-800" role="status">{message}</p> : null}
@@ -177,18 +259,3 @@ export function UserManagement({
   );
 }
 
-async function errorMessage(response: Response) {
-  const payload: unknown = await response.json().catch(() => undefined);
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    "error" in payload &&
-    typeof payload.error === "object" &&
-    payload.error !== null &&
-    "message" in payload.error &&
-    typeof payload.error.message === "string"
-  ) {
-    return payload.error.message;
-  }
-  return "The request could not be completed.";
-}

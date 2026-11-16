@@ -16,7 +16,7 @@ Proposed initial objectives, subject to business and hosting approval:
 3. Proposed retention: 30 daily copies and 12 monthly copies. Confirm storage cost and legal retention needs before configuration.
 4. Do not store backup credentials in the repository or application runtime. Rotate and audit access.
 5. Keep schema migrations and deployment artifacts separately versioned; database backups do not replace migration review.
-6. Media uploads are not implemented and no object-storage provider is configured. If persistent media is introduced, define object versioning, lifecycle, access controls and an independent restore path before launch.
+6. Team profile and publication image uploads are supported through private storage adapters, but no production storage is configured. If using a Render disk, define a file backup and restore path in addition to the database backups; if using S3-compatible storage, define object versioning, lifecycle, access controls and an independent restore path before launch.
 
 ## Recovery procedure
 

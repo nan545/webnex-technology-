@@ -6,7 +6,7 @@ Phase 1 foundation, Phase 2 public website, Phase 3 API foundation, a partial Ph
 **Initial market:** Ghana, with international expansion planned.  
 **Language:** English.
 
-The project establishes the Next.js application, PostgreSQL/Prisma schema, public pages and APIs, enquiry workflow, Auth.js credentials login, server-side RBAC foundations, and initial admin dashboard, enquiries, user management, audit-log views, service content management, and CRM pipeline. Full CMS coverage, media uploads, password reset, and production integrations are not complete.
+The project establishes the Next.js application, PostgreSQL/Prisma schema, public pages and APIs, enquiry workflow, Auth.js credentials login, server-side RBAC foundations, and initial admin dashboard, enquiries, user management, audit-log views, service content management, and CRM pipeline. Full CMS coverage, a general media library, password reset, and production integrations are not complete.
 
 ## Requirements
 
@@ -62,6 +62,7 @@ npm run db:check
 - `db:migrate` creates/applies a development migration and requires a reachable disposable development database.
 - `db:seed` inserts the `SUPER_ADMIN`, `ADMIN`, `EDITOR`, and `SALES` role definitions and permission mappings. It does not create user accounts or sample company content.
 - `admin:bootstrap` is an interactive one-time CLI that creates the first Super Admin; it requires migrations and role seed to be applied. Password input is hidden, 12–72 UTF-8 bytes, and never passed as a command-line argument. It refuses to run when an active Super Admin already exists.
+- `admin:reset-password` is an interactive recovery command for a unique active administrator in the database selected by `DATABASE_URL`. From a trusted terminal, verify the displayed database host/name and administrator email before confirming `RESET`. The new password is entered privately, must be 12–72 UTF-8 bytes, is hashed, and invalidates existing sessions. The command clears login lockout and records a database audit event with no authenticated actor because it is an offline operation. Access to the database credentials is required; this is not an email-based reset.
 - `db:check` runs a real `SELECT 1` connectivity check.
 - `db:deploy` applies committed migrations in a deployment environment.
 
@@ -86,7 +87,7 @@ npm test
 npm run build
 ```
 
-`npm run build` generates the Prisma client and builds Next.js. `npm test` runs isolated request-validation tests; database integration tests are not included because no test database is configured.
+`npm run build` generates the Prisma client and builds Next.js. `npm test` runs the automated unit and request-validation tests. The role-management PostgreSQL integration test is skipped unless explicitly enabled against its dedicated local test database.
 
 Set `NEXT_PUBLIC_SITE_URL` to the confirmed public HTTPS origin before deployment. Until that is supplied, metadata and the sitemap use the local development origin.
 
@@ -107,9 +108,11 @@ Auth.js Credentials uses bcrypt password hashes, eight-hour signed sessions, act
 | `EDITOR` | Dashboard, editorial content permissions and media; no enquiry or user access. Per-item assigned-content scoping is not implemented. |
 | `SALES` | Dashboard and enquiry read/update permissions. |
 
-Implemented admin routes are `/admin/login`, `/admin`, `/admin/enquiries`, `/admin/enquiries/[id]`, `/admin/users`, `/admin/audit-logs`, and `/admin/unauthorized`. Dashboard metrics and records query PostgreSQL directly and are permission-scoped; there are no seeded or fabricated dashboard statistics. Enquiry list supports server-side search, status filtering and pagination; detail supports internal notes, status, assignee and follow-up updates with audit records. User management is Super Admin-only, hashes initial passwords, prevents self role/deactivation changes, protects the last active Super Admin, increments session versions, and writes audit records.
+Implemented admin routes include `/admin/login`, `/admin`, `/admin/enquiries`, `/admin/enquiries/[id]`, `/admin/users`, `/admin/audit-logs`, and `/admin/unauthorized`. Dashboard metrics and records query PostgreSQL directly and are permission-scoped; there are no seeded or fabricated dashboard statistics. Enquiry list supports server-side search, status filtering and pagination; detail supports internal notes, status, assignee and follow-up updates with audit records.
 
-Password reset is intentionally unavailable until an email provider is approved. No administrator invite email, MFA, full media library, or complete role assignment UI has been implemented. Team profiles and their private photo workflow are documented below. Editable navigation and the public contact phone are documented below; other unfinished content modules remain pending.
+On **Users and roles**, a Super Admin can create administrators with an initial password, select an existing role, change another administrator's role or active status, and reset another active administrator's password after confirming their own password. Resets clear login lockout, invalidate existing sessions and write an audit record. Only Super Admins can manage users and roles. User management prevents self role/deactivation changes, protects the last active Super Admin, invalidates affected sessions, and writes audit records. Creating or editing custom roles from the dashboard is not currently available. Apply existing migrations and run `npm run db:seed` before using this feature.
+
+There is no self-service password reset, administrator invite email, MFA, custom-role deletion, or full media library. Passwords must be communicated securely outside the application. The offline recovery command above remains available to trusted database operators. Team profiles and their private photo workflow are documented below. Editable navigation and the public contact phone are documented below; other unfinished content modules remain pending.
 
 ## Phase 5 CMS status (partial)
 
@@ -121,7 +124,13 @@ Team fallback profiles are explicitly listed in `src/data/fallback/team.ts` and 
 
 The additive `20261111110000_phase5_services_cms` migration expands content workflow states and adds service revision history, updater tracking, scheduling timestamp storage, and service slug redirects. **It has not been applied** because PostgreSQL authentication is unavailable. Re-run `npm run db:generate` after schema changes, then use the database setup commands above against a dedicated development database.
 
-Not implemented: CMS editors for homepage/about sections, projects, case studies, industries, blog, categories/tags, testimonials, other global settings, full SEO controls, and a general media library. Team profiles are implemented as a separate CMS workflow below. There is no scheduled-publishing worker; `SCHEDULED` is not accepted by the Services workflow. Service CRUD, revisions, RBAC boundaries, database migration, and public database rendering still need integration tests against an isolated PostgreSQL database.
+Not implemented: CMS editors for homepage/about sections, case studies, industries, categories/tags, testimonials, other global settings, full SEO controls, and a general media library. Project and insight publishing and team profiles are separate workflows described below. There is no scheduled-publishing worker; `SCHEDULED` is not accepted by the Services workflow. Service CRUD, revisions, RBAC boundaries, database migration, and public database rendering still need integration tests against an isolated PostgreSQL database.
+
+### Projects and insights
+
+Administrators with `projects:manage` or `blog:manage` can create and edit drafts under **Projects** or **Insights**. Publication, unpublishing, and changes to published content or its cover require `content:publish`. Save a record first, then optionally upload a JPG, PNG, or WebP cover and a description. Images use the private object-storage configuration described below; uploads are limited to 5 MB and converted to WebP. Published content appears on its public listing, detail page and sitemap; published projects can also appear on the homepage. Previously published URL slugs cannot be changed. The editor supports paragraphs separated by blank lines, not rich text, scheduling, deletion, or revisions.
+
+Apply the `20261115140000_publication_cover_images` migration before deploying code that reads the new image relationships. Review and back up the target database first. Existing records with unsupported content formats or workflow statuses are listed in the admin interface for manual review and are not editable there. Published records with unsupported content are omitted from the new public pages and logged; their data is not changed. Review these records before deployment. Draft cover images are not publicly accessible.
 
 ## Phase 3 API
 
@@ -142,7 +151,7 @@ Successful responses use `{ "data": ..., "meta": { "requestId": "..." } }`. Erro
 | `GET /api/v1/site-settings` | Settings explicitly marked public. |
 | `POST /api/v1/enquiries` | Validates and stores project enquiries; see workflow below. |
 
-The public services listing and detail routes read published PostgreSQL service records as described in Phase 5. Public navigation uses the separate site configuration described below; most other public industry and editorial UI still uses Phase 2 typed content modules and is **not yet hydrated from these APIs/database records**. No production/sample content has been seeded.
+Public services, projects and insights pages read published PostgreSQL records. Public navigation uses the separate site configuration described below; other public content may still use Phase 2 typed content modules. No production/sample content has been seeded.
 
 ## Enquiry workflow
 
@@ -178,13 +187,17 @@ The `/admin/team` module provides paginated and searchable profile management wi
 
 The additive `20261111165000_team_members_profiles` migration extends the existing `TeamMember` and `MediaAsset` models, backfills stable unique slugs, preserves legacy fields and existing published status, and adds profile/photo indexes, a nullable media foreign key, and database checks for new writes. It has **not** been applied because PostgreSQL authentication is unavailable. Apply it only to a reviewed, dedicated development database using `npm run db:deploy`.
 
-Photo upload requires an S3-compatible private bucket and server-only `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`, and `OBJECT_STORAGE_SECRET_ACCESS_KEY` values in `.env`. Production endpoints must use HTTPS. Configure the provider's bucket policy to deny public access; the application serves published photos through a database-checked image proxy and never exposes storage credentials or object keys to the browser. Uploads accept JPG, PNG, and WebP files up to 5 MB, validate the actual image bytes and pixel count, rotate/crop to an 800×1000 WebP, and store metadata in PostgreSQL. Replacing, removing, or deleting a profile performs reference-checked cleanup; failures are logged and surfaced in the admin workflow. An image must be saved as a profile before uploading its photo.
+Photo upload requires persistent private storage. The default S3-compatible option uses server-only `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`, and `OBJECT_STORAGE_SECRET_ACCESS_KEY` values in `.env`; production endpoints must use HTTPS and the bucket must deny public access.
 
-Validation and image transformation tests run with `npm test`. No PostgreSQL migration, authenticated role workflow, object-storage upload, persistence, or Hostinger storage configuration has been verified here. Before production, configure and test a private persistent bucket, apply the migration, and run DB-backed authorization, CRUD, publication, and upload tests against isolated PostgreSQL and storage resources.
+For a single-instance Render web service, you can instead attach a paid persistent disk mounted at `/var/data`, then set `OBJECT_STORAGE_DRIVER="filesystem"` and `OBJECT_STORAGE_FILESYSTEM_PATH="/var/data/webnex-media"`. Render's filesystem is otherwise ephemeral. The disk is only available to that service instance, so do not scale the service to multiple instances; disk-backed deploys also have brief downtime during instance replacement. Files are stored outside `public` and served only through the existing database-checked image routes.
+
+Both backends accept JPG, PNG, and WebP files up to 5 MB, validate the actual image bytes and pixel count, rotate/crop to an 800×1000 WebP, and store metadata in PostgreSQL. Replacing, removing, or deleting a profile performs reference-checked cleanup; failures are logged and surfaced in the admin workflow. An image must be saved as a profile before uploading its photo.
+
+Validation, image transformation, and filesystem storage tests run with `npm test`. No Render disk-backed deployment, PostgreSQL migration, authenticated role workflow, or production persistence has been verified here. Before production, attach and configure the persistent disk (or a private S3-compatible bucket), apply the migration, and run DB-backed authorization, CRUD, publication, and upload tests against isolated PostgreSQL and storage resources.
 
 ## Phase 7 audit status
 
-The local Phase 7 checks passed for lint, TypeScript, 19 automated tests, Prisma schema validation, the production build, sampled public route rendering and responsive overflow on the homepage. Full and production npm audits report zero vulnerabilities after a narrow development-tooling `minimatch` override; see the security report for its maintenance caveat. PostgreSQL authentication still fails (`28P01`), so migrations, persisted workflows and authenticated role boundaries remain unverified. Hostinger plan compatibility, SendGrid delivery and backup restoration are also unverified. **Production readiness: NOT READY.**
+The local Phase 7 checks passed for lint, TypeScript, 19 automated tests, Prisma schema validation, the production build, sampled public route rendering and responsive overflow on the homepage. Full and production npm audits report zero vulnerabilities after a narrow development-tooling `minimatch` override; see the security report for its maintenance caveat. PostgreSQL authentication still fails (`28P01`), so migrations, persisted workflows and authenticated role boundaries remain unverified. Render deployment, disk-backed persistence, SendGrid delivery and backup restoration are also unverified. **Production readiness: NOT READY.**
 
 Phase 7 evidence and operational documents:
 
@@ -233,7 +246,7 @@ types/                  Auth.js session and credentials type extensions
 public/                 Public static assets
 prisma.config.ts        Prisma CLI, migration, and seed configuration
 .env.example            Safe environment-variable template
-OBJECT_STORAGE_*        Optional server-only S3-compatible storage configuration
+OBJECT_STORAGE_*        Optional server-only private S3 or filesystem storage configuration
 RATE_LIMIT_SECRET       Private secret for HMAC-hashed rate-limit identifiers
 AUTH_SECRET             Private Auth.js JWT signing secret
 NEXTAUTH_URL            Public origin required by Auth.js in production
@@ -246,7 +259,7 @@ The schema includes Auth.js-compatible account/session models, users, roles and 
 
 The rate-limit identifier is stored as a keyed HMAC, not a raw IP. The database schema has constraints for enquiry reference format and field lengths. Enquiry writes and notification queue creation share a transaction.
 
-Use reviewed Prisma migrations, least-privilege database credentials, encrypted database connections, and separate off-site backups with a tested restore process before production deployment. Hostinger plan compatibility and production PostgreSQL connectivity have not been verified.
+Use reviewed Prisma migrations, least-privilege database credentials, encrypted database connections, and separate off-site backups with a tested restore process before production deployment. Render service compatibility and production PostgreSQL connectivity have not been verified.
 
 ## Git
 
@@ -266,12 +279,12 @@ git push -u origin main
 - Public API routes are implemented, but public page rendering/navigation/search is not yet wired to these records.
 - Administrator login/logout, credentials hashing, active-account and session-version checks, seeded RBAC, protected admin routes, and first-admin bootstrap are implemented in code, but cannot be verified against PostgreSQL without valid credentials. MFA and password reset are not implemented.
 - An outbox row is created with each enquiry; email delivery and outbox retry processing are not implemented pending provider approval. The API success response means the enquiry is stored and notification is queued, not emailed.
-- Full media upload/management is not implemented. Existing media rows store metadata only; persistent object storage must be selected and configured before uploads.
-- A shared-proxy deployment needs a trusted `x-real-ip` header for per-client rate limits; verify Hostinger's proxy behavior before launch.
+- A general media library is not implemented. Team profile and publication image uploads are supported when private persistent storage is configured; media metadata is stored in PostgreSQL.
+- A shared-proxy deployment needs a trusted `x-real-ip` header for per-client rate limits; verify Render's proxy behavior before launch.
 - Database backups/restore, production credentials, and deployment have not been configured or verified.
 - Projects, case studies, articles, testimonials, contact details, and legal policies are not fabricated. Their pages show an honest empty or approval-required state until verified content is supplied.
 - The privacy and terms pages explicitly state that legal review is pending and are excluded from indexing.
-- Hostinger production hosting compatibility remains unverified.
+- Render production hosting compatibility remains unverified.
 
 Before marking Phase 3 complete, configure a dedicated PostgreSQL test DB, add and run integration/security tests against it, apply and verify the migrations, wire public pages to persisted content, and resolve notification provider configuration.
 

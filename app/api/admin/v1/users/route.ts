@@ -1,7 +1,9 @@
 import { hash } from "bcryptjs";
 import { z } from "zod";
+import { roleKeySchema } from "@/lib/validation/roles";
+import { readBoundedJson } from "@/server/api/bounded-json";
 import { apiError, apiSuccess, handleApiFailure, parsePagination } from "@/server/api/response";
-import { authorizeAdmin } from "@/server/auth/admin-api";
+import { authorizeSuperAdmin } from "@/server/auth/admin-api";
 import { prisma } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
@@ -13,11 +15,11 @@ const createUserSchema = z.object({
     .min(12)
     .max(72)
     .refine((value) => Buffer.byteLength(value, "utf8") <= 72),
-  roleKey: z.enum(["SUPER_ADMIN", "ADMIN", "EDITOR", "SALES"]),
+  roleKey: roleKeySchema,
 });
 
 export async function GET(request: Request) {
-  const authorization = await authorizeAdmin("users:manage");
+  const authorization = await authorizeSuperAdmin("users:manage");
   if (authorization.response) return authorization.response;
   const pagination = parsePagination(new URL(request.url).searchParams);
   if (!pagination) return apiError(400, "INVALID_PAGINATION", "Pagination parameters are invalid.");
@@ -61,16 +63,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const originError = rejectCrossOriginMutation(request);
   if (originError) return originError;
-  const authorization = await authorizeAdmin("users:manage");
+  const authorization = await authorizeSuperAdmin("users:manage");
   if (authorization.response) return authorization.response;
 
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return apiError(400, "INVALID_JSON", "The request body must be valid JSON.");
-  }
-  const input = createUserSchema.safeParse(rawBody);
+  const body = await readBoundedJson(request);
+  if (body.error) return body.error;
+  const input = createUserSchema.safeParse(body.value);
   if (!input.success) return apiError(422, "VALIDATION_FAILED", "Review the administrator details.");
 
   try {

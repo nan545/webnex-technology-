@@ -1,10 +1,9 @@
 import { apiError } from "@/server/api/response";
 
-export async function readBoundedJson(request: Request) {
+export async function readBoundedJson(request: Request, maximumBytes = 16_384) {
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
     return { error: apiError(415, "UNSUPPORTED_MEDIA_TYPE", "Submit the request as JSON.") };
   }
-  const maximumBytes = 16_384;
   const reader = request.body?.getReader();
   if (!reader) return { error: apiError(400, "INVALID_JSON", "The request body is required.") };
   const chunks: Uint8Array[] = [];

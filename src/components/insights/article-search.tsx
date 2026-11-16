@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Article } from "@/data/articles";
 
@@ -66,6 +67,7 @@ export function ArticleSearch({ articles }: { articles: Article[] }) {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((article) => (
             <article className="border border-border p-6" key={article.slug}>
+              {article.image ? <Image alt={article.image.alt} className="mb-5 aspect-video w-full object-cover" height={675} src={article.image.src} unoptimized width={1200} /> : null}
               <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                 {article.category}
               </p>

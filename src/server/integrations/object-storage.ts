@@ -5,10 +5,17 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { env } from "@/server/env";
+import {
+  putFileObject,
+  readFileObject,
+  removeFileObject,
+} from "@/server/integrations/filesystem-object-storage";
 
-type ObjectStorageConfiguration = {
+type S3ObjectStorageConfiguration = {
+  driver: "s3";
   endpoint: string;
   region: string;
   bucket: string;
@@ -16,10 +23,36 @@ type ObjectStorageConfiguration = {
   secretAccessKey: string;
 };
 
+type FilesystemObjectStorageConfiguration = {
+  driver: "filesystem";
+  path: string;
+};
+
 let client: S3Client | null = null;
 let configuredFingerprint = "";
 
 export function getObjectStorageConfiguration() {
+  if (env.OBJECT_STORAGE_DRIVER === "filesystem") {
+    const storagePath = env.OBJECT_STORAGE_FILESYSTEM_PATH;
+    if (!storagePath || !isAbsolute(storagePath)) {
+      throw new Error("Filesystem object storage requires an absolute storage path.");
+    }
+
+    const resolvedPath = resolve(storagePath);
+    const publicPath = resolve(process.cwd(), "public");
+    const pathFromPublic = relative(publicPath, resolvedPath);
+    if (
+      pathFromPublic === "" ||
+      (!pathFromPublic.startsWith(`..${sep}`) &&
+        pathFromPublic !== ".." &&
+        !isAbsolute(pathFromPublic))
+    ) {
+      throw new Error("Filesystem object storage must be outside the public directory.");
+    }
+
+    return { driver: "filesystem", path: resolvedPath } satisfies FilesystemObjectStorageConfiguration;
+  }
+
   const values = [
     env.OBJECT_STORAGE_ENDPOINT,
     env.OBJECT_STORAGE_REGION,
@@ -47,10 +80,10 @@ export function getObjectStorageConfiguration() {
   if (!parsed.success) {
     throw new Error("Object storage configuration is incomplete.");
   }
-  return parsed.data;
+  return { driver: "s3", ...parsed.data } satisfies S3ObjectStorageConfiguration;
 }
 
-function getClient(configuration: ObjectStorageConfiguration) {
+function getClient(configuration: S3ObjectStorageConfiguration) {
   const fingerprint = [
     configuration.endpoint,
     configuration.region,
@@ -77,6 +110,10 @@ function getClient(configuration: ObjectStorageConfiguration) {
 export async function putPrivateObject(key: string, body: Buffer) {
   const configuration = getObjectStorageConfiguration();
   if (!configuration) throw new Error("Persistent object storage is not configured.");
+  if (configuration.driver === "filesystem") {
+    await putFileObject(configuration.path, key, body);
+    return;
+  }
   await getClient(configuration).send(new PutObjectCommand({
     Bucket: configuration.bucket,
     Key: key,
@@ -89,6 +126,9 @@ export async function putPrivateObject(key: string, body: Buffer) {
 export async function readPrivateObject(key: string) {
   const configuration = getObjectStorageConfiguration();
   if (!configuration) throw new Error("Persistent object storage is not configured.");
+  if (configuration.driver === "filesystem") {
+    return readFileObject(configuration.path, key);
+  }
   const result = await getClient(configuration).send(new GetObjectCommand({
     Bucket: configuration.bucket,
     Key: key,
@@ -100,6 +140,10 @@ export async function readPrivateObject(key: string) {
 export async function removePrivateObject(key: string) {
   const configuration = getObjectStorageConfiguration();
   if (!configuration) throw new Error("Persistent object storage is not configured.");
+  if (configuration.driver === "filesystem") {
+    await removeFileObject(configuration.path, key);
+    return;
+  }
   await getClient(configuration).send(new DeleteObjectCommand({
     Bucket: configuration.bucket,
     Key: key,

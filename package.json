@@ -10,7 +10,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --conditions=react-server --import dotenv/config --import tsx --test tests/enquiry-validation.test.ts tests/enquiry-route.test.ts tests/cms-service-validation.test.ts tests/phase6-validation.test.ts tests/team-member.test.ts tests/filesystem-object-storage.test.ts tests/whatsapp.test.ts tests/site-configuration.test.ts tests/admin-password-reset.test.ts tests/admin-password-reset-db.test.ts tests/role-management.test.ts tests/publications.test.ts",
+    "test": "node --conditions=react-server --import dotenv/config --import tsx --test tests/admin-idle-session.test.ts tests/enquiry-validation.test.ts tests/enquiry-route.test.ts tests/cms-service-validation.test.ts tests/phase6-validation.test.ts tests/team-member.test.ts tests/filesystem-object-storage.test.ts tests/whatsapp.test.ts tests/site-configuration.test.ts tests/admin-password-reset.test.ts tests/admin-password-reset-db.test.ts tests/role-management.test.ts tests/publications.test.ts",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",

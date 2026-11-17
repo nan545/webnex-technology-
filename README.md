@@ -101,6 +101,14 @@ After applying migrations and seeding roles:
 
 Auth.js Credentials uses bcrypt password hashes, eight-hour signed sessions, active-account/session-version checks on server session reads, login rate limiting, temporary lockout after five invalid attempts, generic login errors, and login audit records. Admin endpoints re-check permissions from the database for each operation. Admin state-changing endpoints require a same-origin `Origin` header. The first Super Admin is created by the CLI and cannot be self-provisioned through the web UI.
 
+Administrators are signed out after 15 minutes without interaction. Activity
+updates are sent at most once every five seconds; the server rejects an expired
+session even if the browser is closed or JavaScript is disabled. Sessions
+created before this timeout was introduced require signing in again.
+The signed JWT remains stateless: signing out clears the browser cookie but
+does not revoke a copied token; administrator deactivation or a session-version
+change invalidates existing tokens on their next server check.
+
 | Role | Access |
 | --- | --- |
 | `SUPER_ADMIN` | All seeded permissions, including users, role assignment, audit log and settings. |

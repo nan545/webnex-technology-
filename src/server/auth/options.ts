@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { z } from "zod";
+import { adminIdleDeadline, ADMIN_IDLE_TIMEOUT_MS } from "@/lib/admin-session";
 import { prisma } from "@/server/db";
 import { consumeLoginRateLimit } from "@/server/security/auth-rate-limit";
 
@@ -143,12 +144,18 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
+      const now = Date.now();
       if (user) {
         token.sessionVersion = user.sessionVersion;
+        token.lastActivity = now;
       }
 
-      if (!token.sub || typeof token.sessionVersion !== "number") {
+      if (
+        !token.sub ||
+        typeof token.sessionVersion !== "number" ||
+        adminIdleDeadline(token.lastActivity, now) === null
+      ) {
         return {};
       }
 
@@ -164,11 +171,13 @@ export const authOptions: NextAuthOptions = {
         return {};
       }
 
+      if (trigger === "update") token.lastActivity = now;
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token.sub) {
+      if (session.user && token.sub && typeof token.lastActivity === "number") {
         session.user.id = token.sub;
+        session.idleExpires = token.lastActivity + ADMIN_IDLE_TIMEOUT_MS;
       }
       return session;
     },

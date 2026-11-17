@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { AdminContext } from "@/server/auth/authorization";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
+import { IdleSession } from "@/components/admin/idle-session";
 import { DatabaseStatus } from "@/components/admin/database-status";
 import { BrandLogo } from "@/components/layout/brand-logo";
 
@@ -81,6 +82,7 @@ export function AdminShell({
         </nav>
       </aside>
       <div className="min-w-0">
+        <IdleSession />
         <header className="flex min-h-[72px] items-center justify-between border-b border-border bg-white px-5 sm:px-8">
           <div>
             <p className="text-xs text-muted">Administration / Workspace</p>

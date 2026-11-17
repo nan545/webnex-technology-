@@ -21,7 +21,6 @@ import { siteConfig } from "@/config/site";
 import { industries } from "@/data/industries";
 import { pageMetadata } from "@/lib/seo";
 import { readPublishedServicesForPage } from "@/server/content/services";
-import { readWebsiteProjects } from "@/server/content/website-publications";
 
 export const metadata = {
   ...pageMetadata(
@@ -233,7 +232,7 @@ export default function Home() {
         <Container>
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <SectionHeading
-              description="Explore approved project work from WEBNEX Technologies."
+              description="We will share project work here when approved case studies are available."
               eyebrow="Selected work"
               title="Projects and case studies."
             />
@@ -244,9 +243,12 @@ export default function Home() {
               Explore projects <ArrowRight aria-hidden="true" size={16} />
             </Link>
           </div>
-          <Suspense fallback={<p className="mt-8 text-sm text-muted" role="status">Loading projects...</p>}>
-            <HomeProjects />
-          </Suspense>
+          <div className="mt-8">
+            <EmptyState
+              description="No approved projects have been published yet. We do not present demonstration work as completed client engagements."
+              title="Portfolio details are being prepared"
+            />
+          </div>
         </Container>
       </section>
 
@@ -254,7 +256,7 @@ export default function Home() {
         <Container className="grid items-center gap-8 lg:grid-cols-[1fr_auto]">
           <div>
             <SectionHeading
-              description="Explore perspectives on software engineering and digital products."
+              description="When approved editorial content is ready, it will be published in Insights."
               eyebrow="Ideas and perspectives"
               title="Insights from the work of building digital products."
             />
@@ -290,20 +292,6 @@ async function HomeServices() {
       />
     </div>
   );
-}
-
-async function HomeProjects() {
-  const result = await readWebsiteProjects();
-  return result.items.length ? <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    {result.items.slice(0, 3).map((project) => <article className="border border-border bg-white p-6" key={project.slug}>
-      <p className="text-xs font-semibold uppercase text-blue-700">{project.industry}</p>
-      <h3 className="mt-3 font-semibold"><Link href={`/projects/${project.slug}`}>{project.title}</Link></h3>
-      <p className="mt-3 text-sm text-muted">{project.summary}</p>
-    </article>)}
-  </div> : <div className="mt-8"><EmptyState
-    title={result.unavailable ? "Projects are temporarily unavailable" : "Portfolio details are being prepared"}
-    description={result.unavailable ? "Please try again later." : "No approved projects have been published yet."}
-  /></div>;
 }
 
 function PrincipleCard({

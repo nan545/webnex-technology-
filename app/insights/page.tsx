@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArticleSearch } from "@/components/insights/article-search";
 import { Container } from "@/components/ui/container";
 import { PageHero } from "@/components/ui/page-hero";
-import { readWebsiteInsights } from "@/server/content/website-publications";
+import { articles } from "@/data/articles";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata(
@@ -11,20 +11,17 @@ export const metadata: Metadata = pageMetadata(
   "/insights",
 );
 
-export const dynamic = "force-dynamic";
-
-export default async function InsightsPage() {
-  const { items: articles, unavailable } = await readWebsiteInsights();
+export default function InsightsPage() {
   return (
     <>
       <PageHero
-        description="Articles and perspectives on building useful digital products."
+        description="Articles and perspectives will be published here when editorial content has been reviewed and approved."
         eyebrow="Insights"
         title="Ideas for building useful digital products."
       />
       <section className="py-16 sm:py-20">
         <Container>
-          {unavailable ? <p role="status">Insights are temporarily unavailable. Please try again later.</p> : <ArticleSearch articles={articles} />}
+          <ArticleSearch articles={articles} />
         </Container>
       </section>
     </>

@@ -512,6 +512,12 @@ model MediaAsset {
   @@index([mimeType])
 }
 
+model StoredMediaObject {
+  storageKey String   @id @db.VarChar(500)
+  data       Bytes
+  createdAt  DateTime @default(now())
+}
+
 model Enquiry {
   id                String            @id @default(uuid()) @db.Uuid
   reference         String            @unique @db.VarChar(32)

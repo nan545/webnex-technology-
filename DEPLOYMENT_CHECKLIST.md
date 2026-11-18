@@ -8,6 +8,7 @@
 - [ ] Confirm secure PostgreSQL connectivity from that runtime, connection limits/pooling, TLS and migration execution.
 - [ ] Confirm support for environment variables, HTTPS, deployment workflow, webhook ingress and scheduled/background workers.
 - [ ] Attach a paid Render persistent disk mounted at `/var/data`; set `OBJECT_STORAGE_DRIVER=filesystem` and `OBJECT_STORAGE_FILESYSTEM_PATH=/var/data/webnex-media`. Keep the service at one instance and verify the disk's backup/recovery plan, or configure a private S3-compatible bucket instead.
+- [ ] Alternatively, for PostgreSQL media storage, back up and review the target database, deploy the `20261118020000_database_media_storage` migration, then deploy the compatible application and set `OBJECT_STORAGE_DRIVER=database`. Check database storage limits and media backups. Switching drivers does not move existing images. Verify upload, authorized preview, public visibility, replacement, removal, and persistence after redeployment.
 - [ ] If shared hosting cannot meet runtime/database/worker requirements, select a compatible VPS or managed application/database hosting. Do not deploy based on shared-hosting assumptions.
 - [ ] Confirm the `.com` domain and final canonical HTTPS origin.
 

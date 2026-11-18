@@ -197,11 +197,22 @@ The additive `20261111165000_team_members_profiles` migration extends the existi
 
 Photo upload requires persistent private storage. The default S3-compatible option uses server-only `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`, and `OBJECT_STORAGE_SECRET_ACCESS_KEY` values in `.env`; production endpoints must use HTTPS and the bucket must deny public access.
 
+To store media in PostgreSQL instead, apply the
+`20261118020000_database_media_storage` migration, then set
+`OBJECT_STORAGE_DRIVER="database"` and restart or redeploy the application.
+Images share the database's storage quota and backup/restore lifecycle; monitor
+capacity and include media in database backups. Individual stored images are
+limited to 5 MB after optimization. Switching storage drivers does not migrate
+existing objects: copy and verify them before changing the driver, or existing
+images may become unavailable. Apply the migration before setting the driver.
+Stored objects are created before their associated metadata; an interrupted
+process can leave an orphaned object that consumes database space.
+
 For a single-instance Render web service, you can instead attach a paid persistent disk mounted at `/var/data`, then set `OBJECT_STORAGE_DRIVER="filesystem"` and `OBJECT_STORAGE_FILESYSTEM_PATH="/var/data/webnex-media"`. Render's filesystem is otherwise ephemeral. The disk is only available to that service instance, so do not scale the service to multiple instances; disk-backed deploys also have brief downtime during instance replacement. Files are stored outside `public` and served only through the existing database-checked image routes.
 
-Both backends accept JPG, PNG, and WebP files up to 5 MB, validate the actual image bytes and pixel count, rotate/crop to an 800×1000 WebP, and store metadata in PostgreSQL. Replacing, removing, or deleting a profile performs reference-checked cleanup; failures are logged and surfaced in the admin workflow. An image must be saved as a profile before uploading its photo.
+All backends accept JPG, PNG, and WebP files up to 5 MB, validate the actual image bytes and pixel count, rotate/crop to an 800×1000 WebP, and store metadata in PostgreSQL. Replacing, removing, or deleting a profile performs reference-checked cleanup; failures are logged and surfaced in the admin workflow. An image must be saved as a profile before uploading its photo.
 
-Validation, image transformation, and filesystem storage tests run with `npm test`. No Render disk-backed deployment, PostgreSQL migration, authenticated role workflow, or production persistence has been verified here. Before production, attach and configure the persistent disk (or a private S3-compatible bucket), apply the migration, and run DB-backed authorization, CRUD, publication, and upload tests against isolated PostgreSQL and storage resources.
+Validation, image transformation, and filesystem storage tests run with `npm test`. The PostgreSQL media integration test is opt-in and must run against a disposable test database. Render-backed media storage and production persistence must be verified after configuring the chosen storage backend.
 
 ## Phase 7 audit status
 

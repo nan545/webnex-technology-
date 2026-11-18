@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { z } from "zod";
+import { prisma } from "@/server/db";
 import { env } from "@/server/env";
 import {
   putFileObject,
@@ -32,6 +33,9 @@ let client: S3Client | null = null;
 let configuredFingerprint = "";
 
 export function getObjectStorageConfiguration() {
+  if (env.OBJECT_STORAGE_DRIVER === "database") {
+    return { driver: "database" } as const;
+  }
   if (env.OBJECT_STORAGE_DRIVER === "filesystem") {
     const storagePath = env.OBJECT_STORAGE_FILESYSTEM_PATH;
     if (!storagePath || !isAbsolute(storagePath)) {
@@ -110,6 +114,10 @@ function getClient(configuration: S3ObjectStorageConfiguration) {
 export async function putPrivateObject(key: string, body: Buffer) {
   const configuration = getObjectStorageConfiguration();
   if (!configuration) throw new Error("Persistent object storage is not configured.");
+  if (configuration.driver === "database") {
+    await prisma.storedMediaObject.create({ data: { storageKey: key, data: new Uint8Array(body) } });
+    return;
+  }
   if (configuration.driver === "filesystem") {
     await putFileObject(configuration.path, key, body);
     return;
@@ -126,6 +134,18 @@ export async function putPrivateObject(key: string, body: Buffer) {
 export async function readPrivateObject(key: string) {
   const configuration = getObjectStorageConfiguration();
   if (!configuration) throw new Error("Persistent object storage is not configured.");
+  if (configuration.driver === "database") {
+    const object = await prisma.storedMediaObject.findUniqueOrThrow({
+      where: { storageKey: key },
+      select: { data: true },
+    });
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(object.data);
+        controller.close();
+      },
+    });
+  }
   if (configuration.driver === "filesystem") {
     return readFileObject(configuration.path, key);
   }
@@ -140,6 +160,10 @@ export async function readPrivateObject(key: string) {
 export async function removePrivateObject(key: string) {
   const configuration = getObjectStorageConfiguration();
   if (!configuration) throw new Error("Persistent object storage is not configured.");
+  if (configuration.driver === "database") {
+    await prisma.storedMediaObject.deleteMany({ where: { storageKey: key } });
+    return;
+  }
   if (configuration.driver === "filesystem") {
     await removeFileObject(configuration.path, key);
     return;

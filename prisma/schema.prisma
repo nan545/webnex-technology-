@@ -101,6 +101,8 @@ model User {
   updatedServices     Service[]         @relation("ServiceUpdater")
   serviceRevisions    ServiceRevision[]
   createdProjects     Project[]         @relation("ProjectCreator")
+  workAssignments     WorkProjectAssignment[]
+  createdWorkProjects WorkProject[]     @relation("WorkProjectCreator")
   createdCaseStudies  CaseStudy[]       @relation("CaseStudyCreator")
   createdTeamMembers  TeamMember[]      @relation("TeamMemberCreator")
   createdTestimonials Testimonial[]     @relation("TestimonialCreator")
@@ -346,6 +348,52 @@ model ProjectService {
 
   @@id([projectId, serviceId])
   @@index([serviceId])
+}
+
+model WorkProject {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(120)
+  description String   @db.Text
+  status      String   @default("NOT_STARTED") @db.VarChar(20)
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy   User                    @relation("WorkProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignments WorkProjectAssignment[]
+
+  @@index([updatedAt])
+}
+
+model WorkProjectAssignment {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  project      WorkProject               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification WorkAssignmentNotification?
+
+  @@unique([projectId, userId])
+  @@index([userId, projectId])
+}
+
+model WorkAssignmentNotification {
+  id                String             @id @default(uuid()) @db.Uuid
+  assignmentId      String             @unique @db.Uuid
+  status            NotificationStatus @default(PENDING)
+  attemptCount      Int                @default(0)
+  nextAttemptAt     DateTime           @default(now())
+  lastError         String?            @db.VarChar(500)
+  sentAt            DateTime?
+  providerMessageId String?            @db.VarChar(200)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  assignment WorkProjectAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
 }
 
 model CaseStudy {

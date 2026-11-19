@@ -13,6 +13,7 @@ const activeNavigation = [
   { href: "/admin/proposals", label: "Proposals", permission: "proposals:manage" },
   { href: "/admin/integrations", label: "Integrations", permission: "settings:manage" },
   { href: "/admin/services", label: "Services", permission: "content:read" },
+  { href: "/admin/work-projects", label: "Work projects", permission: "dashboard:read" },
   { href: "/admin/publications/projects", label: "Projects", permission: "projects:manage" },
   { href: "/admin/publications/insights", label: "Insights", permission: "blog:manage" },
   { href: "/admin/team", label: "Team Members", permission: "team:view" },

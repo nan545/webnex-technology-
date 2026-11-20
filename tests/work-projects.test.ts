@@ -7,6 +7,11 @@ import { listWorkProjects, saveWorkProject } from "../src/server/content/work-pr
 import { prisma } from "../src/server/db";
 import { env } from "../src/server/env";
 import { dispatchWorkAssignmentEmails } from "../src/server/integrations/work-assignment-email";
+import { sendGmailAssignment } from "../src/server/integrations/gmail";
+import { EmailDeliveryError } from "../src/server/integrations/email-delivery-error";
+import { verifyEmailWorkflowToken } from "../src/server/integrations/github-email-trigger";
+import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
+import { POST as dispatchPOST } from "../app/api/internal/work-assignment-email/route";
 
 test("work project validation rejects duplicate accounts and invalid statuses", () => {
   const member = randomUUID();
@@ -97,6 +102,103 @@ test("assignment dispatcher sends to the assigned account and records provider a
   const retryCounts = await dispatchWorkAssignmentEmails();
   assert.equal(retryCounts.retried, 1);
   assert.equal(updates.at(-1)?.data.status, "PENDING");
+});
+
+test("Gmail assignment messages address the member and encode project text safely", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url, init) => {
+    assert.equal(String(url), "https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
+    const body = JSON.parse(String(init?.body)) as { raw: string };
+    const message = Buffer.from(body.raw, "base64url").toString("utf8");
+    assert.match(message, /To: member@example\.com\r\n/);
+    const content = message.split("\r\n\r\n")[1];
+    assert.ok(content);
+    const text = Buffer.from(content.replaceAll("\r\n", ""), "base64").toString("utf8");
+    assert.match(text, /Café project/);
+    assert.match(text, /https:\/\/example\.com\/admin\/work-projects/);
+    return Response.json({ id: "gmail-message-id" });
+  };
+  assert.equal(await sendGmailAssignment({
+    token: "test-token", from: "sender@example.com", to: "member@example.com",
+    title: "Café project", siteUrl: new URL("https://example.com"),
+  }), "gmail-message-id");
+  await assert.rejects(() => sendGmailAssignment({
+    token: "test-token", from: "sender@example.com", to: "bad@example.com\r\nBcc: other@example.com",
+    title: "Project", siteUrl: new URL("https://example.com"),
+  }), EmailDeliveryError);
+  globalThis.fetch = async () => new Response(null, { status: 429 });
+  await assert.rejects(() => sendGmailAssignment({
+    token: "test-token", from: "sender@example.com", to: "member@example.com",
+    title: "Project", siteUrl: new URL("https://example.com"),
+  }), (error: unknown) => error instanceof EmailDeliveryError && error.transient);
+});
+
+test("email trigger accepts only the configured signed GitHub workflow", async (t) => {
+  const oldId = process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID;
+  const oldRef = process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF;
+  t.after(() => {
+    if (oldId === undefined) delete process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID;
+    else process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID = oldId;
+    if (oldRef === undefined) delete process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF;
+    else process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF = oldRef;
+  });
+  process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID = "123";
+  process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/assignment-email.yml@refs/heads/main";
+  const { publicKey, privateKey } = await generateKeyPair("RS256");
+  const jwk = { ...await exportJWK(publicKey), kid: "test-key", alg: "RS256" };
+  const keys = createLocalJWKSet({ keys: [jwk] });
+  const makeToken = (claims: Record<string, string>) => new SignJWT({
+    repository_id: "123",
+    workflow_ref: process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF,
+    ref: "refs/heads/main",
+    event_name: "schedule",
+    ...claims,
+  }).setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer("https://token.actions.githubusercontent.com")
+    .setAudience("webnex-work-assignment-email")
+    .setSubject("test")
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
+  assert.equal(await verifyEmailWorkflowToken(await makeToken({}), keys), true);
+  assert.equal(await verifyEmailWorkflowToken(await makeToken({ repository_id: "456" }), keys), false);
+  assert.equal(await verifyEmailWorkflowToken(await makeToken({ workflow_ref: "owner/repo/.github/workflows/other.yml@refs/heads/main" }), keys), false);
+  assert.equal(await verifyEmailWorkflowToken(await makeToken({ ref: "refs/heads/other" }), keys), false);
+  assert.equal(await verifyEmailWorkflowToken(await makeToken({ event_name: "pull_request" }), keys), false);
+  await assert.rejects(() => verifyEmailWorkflowToken("invalid-token", keys));
+});
+
+test("disabled or unauthenticated email triggers do not dispatch", async (t) => {
+  const keys = ["WORK_ASSIGNMENT_EMAIL_PROVIDER", "EMAIL_DISPATCH_GITHUB_REPOSITORY_ID", "EMAIL_DISPATCH_GITHUB_WORKFLOW_REF"] as const;
+  const old = keys.map((key) => process.env[key]);
+  t.after(() => keys.forEach((key, index) => {
+    if (old[index] === undefined) delete process.env[key];
+    else process.env[key] = old[index];
+  }));
+  delete process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER;
+  assert.equal((await dispatchPOST(new Request("https://example.com", { method: "POST" }))).status, 503);
+  process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER = "gmail";
+  process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID = "123";
+  process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF = "workflow";
+  assert.equal((await dispatchPOST(new Request("https://example.com", { method: "POST" }))).status, 401);
+  assert.equal((await dispatchPOST(new Request("https://example.com", {
+    method: "POST", headers: { authorization: "Bearer invalid" },
+  }))).status, 401);
+});
+
+test("missing Gmail configuration leaves the assignment queue untouched", async (t) => {
+  const provider = process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER;
+  const clientId = process.env.GMAIL_CLIENT_ID;
+  t.after(() => {
+    if (provider === undefined) delete process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER;
+    else process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER = provider;
+    if (clientId === undefined) delete process.env.GMAIL_CLIENT_ID;
+    else process.env.GMAIL_CLIENT_ID = clientId;
+  });
+  process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER = "gmail";
+  delete process.env.GMAIL_CLIENT_ID;
+  await assert.rejects(() => dispatchWorkAssignmentEmails(), /Gmail assignment email settings/);
 });
 
 test("work assignments, isolation and notifications persist in isolated PostgreSQL", {

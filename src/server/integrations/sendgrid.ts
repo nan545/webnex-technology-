@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/server/env";
+import { EmailDeliveryError } from "@/server/integrations/email-delivery-error";
 
 export type OutgoingEmail = {
   outboxId: string;
@@ -9,14 +10,7 @@ export type OutgoingEmail = {
   html: string;
 };
 
-export class SendGridDeliveryError extends Error {
-  constructor(
-    message: string,
-    readonly transient: boolean,
-  ) {
-    super(message);
-  }
-}
+export class SendGridDeliveryError extends EmailDeliveryError {}
 
 export function getSendGridConfiguration() {
   if (!env.SENDGRID_API_KEY || !env.SENDGRID_FROM_EMAIL || !env.NOTIFICATION_TO_EMAIL) {

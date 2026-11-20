@@ -1,0 +1,44 @@
+name: Assignment emails
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+
+concurrency:
+  group: assignment-email-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: vars.ENABLE_WORK_ASSIGNMENT_EMAIL == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger assignment email dispatch
+        env:
+          DISPATCH_URL: https://webnex-technology-1.onrender.com/api/internal/work-assignment-email
+        run: |
+          node <<'NODE'
+          const oidcUrl = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          oidcUrl.searchParams.set("audience", "webnex-work-assignment-email");
+          const main = async () => {
+            const tokenResponse = await fetch(oidcUrl, {
+              headers: { Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
+            });
+            if (!tokenResponse.ok) throw new Error(`OIDC token request failed: ${tokenResponse.status}`);
+            const { value } = await tokenResponse.json();
+            if (typeof value !== "string") throw new Error("OIDC token missing.");
+            const response = await fetch(process.env.DISPATCH_URL, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${value}` },
+              signal: AbortSignal.timeout(180000),
+            });
+            console.log("Dispatch response:", response.status, await response.text());
+            if (!response.ok) process.exitCode = 1;
+          };
+          main().catch((error) => { console.error(error.message); process.exitCode = 1; });
+          NODE

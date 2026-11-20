@@ -21,7 +21,6 @@ const activeNavigation = [
   { href: "/admin/enquiries", label: "Enquiries", permission: "enquiries:read" },
   { href: "/admin/users", label: "Users and roles", permission: "users:manage" },
   { href: "/admin/audit-logs", label: "Audit logs", permission: "audit:read" },
-  { href: "/admin/navigation", label: "Navigation", permission: "content:publish" },
   { href: "/admin/settings", label: "Settings", permission: "settings:manage" },
 ] as const;
 

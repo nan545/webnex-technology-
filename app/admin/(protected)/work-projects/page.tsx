@@ -16,10 +16,24 @@ export default async function WorkProjectsPage() {
           isActive: true,
           roles: { some: { role: { permissions: { some: { permission: { key: "dashboard:read" } } } } } },
         },
-        select: { id: true, name: true, email: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          smsAlertsEnabled: true,
+          whatsappAlertsEnabled: true,
+        },
         orderBy: { email: "asc" },
       })
       : Promise.resolve([]),
   ]);
-  return <WorkProjectManagement projects={projects} users={users} canManage={canManage} />;
+  return <WorkProjectManagement
+    projects={projects}
+    users={users.map(({ phone, ...user }) => ({
+      ...user,
+      hasPhone: Boolean(phone),
+    }))}
+    canManage={canManage}
+  />;
 }

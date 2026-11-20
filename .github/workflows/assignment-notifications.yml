@@ -1,4 +1,4 @@
-name: Assignment emails
+name: Assignment notifications
 
 on:
   schedule:
@@ -9,22 +9,22 @@ permissions:
   id-token: write
 
 concurrency:
-  group: assignment-email-dispatch
+  group: assignment-notification-dispatch
   cancel-in-progress: false
 
 jobs:
   dispatch:
-    if: vars.ENABLE_WORK_ASSIGNMENT_EMAIL == 'true'
+    if: vars.ENABLE_WORK_ASSIGNMENT_NOTIFICATIONS == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Trigger assignment email dispatch
+      - name: Trigger assignment message dispatch
         env:
-          DISPATCH_URL: https://webnex-technology-1.onrender.com/api/internal/work-assignment-email
+          DISPATCH_URL: https://webnex-technology-1.onrender.com/api/internal/work-assignment-notifications
         run: |
           node <<'NODE'
           const oidcUrl = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
-          oidcUrl.searchParams.set("audience", "webnex-work-assignment-email");
+          oidcUrl.searchParams.set("audience", "webnex-work-assignment-notifications");
           const main = async () => {
             const tokenResponse = await fetch(oidcUrl, {
               headers: { Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },

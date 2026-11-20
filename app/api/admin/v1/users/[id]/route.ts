@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { z } from "zod";
+import { contactPhoneSchema } from "@/lib/validation/contact-phone";
 import { roleKeySchema } from "@/lib/validation/roles";
 import { readBoundedJson } from "@/server/api/bounded-json";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
@@ -10,6 +11,9 @@ import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 const updateSchema = z
   .object({
     name: z.string().trim().min(2).max(120).optional(),
+    phone: contactPhoneSchema.optional(),
+    smsAlertsEnabled: z.boolean().optional(),
+    whatsappAlertsEnabled: z.boolean().optional(),
     isActive: z.boolean().optional(),
     roleKey: roleKeySchema.optional(),
   })
@@ -53,11 +57,19 @@ export async function PATCH(
             id: true,
             name: true,
             email: true,
+            phone: true,
+            smsAlertsEnabled: true,
+            whatsappAlertsEnabled: true,
             isActive: true,
             roles: { select: { role: { select: { id: true, key: true } } } },
           },
         });
         if (!existing) return null;
+
+        const phone = input.data.phone !== undefined ? input.data.phone : existing.phone;
+        const smsAlertsEnabled = input.data.smsAlertsEnabled ?? existing.smsAlertsEnabled;
+        const whatsappAlertsEnabled = input.data.whatsappAlertsEnabled ?? existing.whatsappAlertsEnabled;
+        if ((smsAlertsEnabled || whatsappAlertsEnabled) && !phone) return { invalidContact: true } as const;
 
         const currentRole = existing.roles[0]?.role;
         const hasSuperAdminRole = existing.roles.some(({ role }) => role.key === "SUPER_ADMIN");
@@ -92,6 +104,9 @@ export async function PATCH(
           where: { id },
           data: {
             ...(input.data.name !== undefined ? { name: input.data.name } : {}),
+            ...(input.data.phone !== undefined ? { phone: input.data.phone } : {}),
+            ...(input.data.smsAlertsEnabled !== undefined ? { smsAlertsEnabled: input.data.smsAlertsEnabled } : {}),
+            ...(input.data.whatsappAlertsEnabled !== undefined ? { whatsappAlertsEnabled: input.data.whatsappAlertsEnabled } : {}),
             ...(input.data.isActive !== undefined ? { isActive: input.data.isActive } : {}),
             ...(input.data.isActive !== undefined && input.data.isActive !== existing.isActive ||
             roleChanged
@@ -106,8 +121,49 @@ export async function PATCH(
                 }
               : {}),
           },
-          select: { id: true, name: true, email: true, isActive: true, updatedAt: true },
+          select: { id: true, name: true, email: true, phone: true, smsAlertsEnabled: true, whatsappAlertsEnabled: true, isActive: true, updatedAt: true },
         });
+        if (
+          input.data.phone !== undefined
+          || input.data.smsAlertsEnabled !== undefined
+          || input.data.whatsappAlertsEnabled !== undefined
+        ) {
+          const now = new Date();
+          const smsRequeued = phone && smsAlertsEnabled
+            ? await transaction.workAssignmentNotification.updateMany({
+              where: { assignment: { userId: id }, smsStatus: "FAILED" },
+              data: { smsStatus: "PENDING", smsNextAttemptAt: now, smsLastError: null },
+            })
+            : { count: 0 };
+          const whatsappRequeued = phone && whatsappAlertsEnabled
+            ? await transaction.workAssignmentNotification.updateMany({
+              where: { assignment: { userId: id }, whatsappStatus: "FAILED" },
+              data: { whatsappStatus: "PENDING", whatsappNextAttemptAt: now, whatsappLastError: null },
+            })
+            : { count: 0 };
+          const requeuedCount = smsRequeued.count + whatsappRequeued.count;
+          if (requeuedCount) {
+            await transaction.workAssignmentNotification.updateMany({
+              where: {
+                assignment: { userId: id },
+                OR: [
+                  ...(phone && smsAlertsEnabled ? [{ smsStatus: "PENDING" as const }] : []),
+                  ...(phone && whatsappAlertsEnabled ? [{ whatsappStatus: "PENDING" as const }] : []),
+                ],
+              },
+              data: { status: "PENDING", nextAttemptAt: now, lastError: null },
+            });
+            await transaction.auditLog.create({
+              data: {
+                actorId: authorization.admin!.id,
+                action: "WORK_ASSIGNMENT_ALERTS_REQUEUED",
+                entityType: "User",
+                entityId: id,
+                details: { channelCount: requeuedCount },
+              },
+            });
+          }
+        }
         await transaction.auditLog.create({
           data: {
             actorId: authorization.admin!.id,
@@ -122,6 +178,9 @@ export async function PATCH(
             entityId: id,
             details: {
               ...(input.data.name !== undefined ? { nameChanged: true } : {}),
+              ...(input.data.phone !== undefined ? { phoneChanged: true } : {}),
+              ...(input.data.smsAlertsEnabled !== undefined ? { smsAlertsEnabled } : {}),
+              ...(input.data.whatsappAlertsEnabled !== undefined ? { whatsappAlertsEnabled } : {}),
               ...(input.data.isActive !== undefined ? { isActive: input.data.isActive } : {}),
               ...(roleChanged ? { previousRole: currentRole?.key ?? null, role: role!.key } : {}),
             },
@@ -133,7 +192,9 @@ export async function PATCH(
     );
 
     return user
-      ? apiSuccess(user)
+      ? "invalidContact" in user
+        ? apiError(422, "INVALID_CONTACT", "A valid phone number is required when SMS or WhatsApp alerts are enabled.")
+        : apiSuccess(user)
       : apiError(404, "NOT_FOUND", "Administrator was not found.");
   } catch (error) {
     if (error instanceof LastSuperAdminError) {

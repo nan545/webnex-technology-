@@ -2,16 +2,16 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { POST } from "../app/api/admin/v1/work-projects/route";
+import { contactPhoneSchema } from "../src/lib/validation/contact-phone";
 import { workProjectSchema } from "../src/lib/validation/work-project";
 import { listWorkProjects, saveWorkProject } from "../src/server/content/work-projects";
 import { prisma } from "../src/server/db";
-import { env } from "../src/server/env";
-import { dispatchWorkAssignmentEmails } from "../src/server/integrations/work-assignment-email";
-import { sendGmailAssignment } from "../src/server/integrations/gmail";
-import { EmailDeliveryError } from "../src/server/integrations/email-delivery-error";
-import { verifyEmailWorkflowToken } from "../src/server/integrations/github-email-trigger";
+import { dispatchWorkAssignmentNotifications } from "../src/server/integrations/work-assignment-notifications";
+import { DeliveryError } from "../src/server/integrations/delivery-error";
+import { createTwilioAssignmentSender, normalizeAssignmentPhone } from "../src/server/integrations/twilio-assignment-alerts";
+import { verifyNotificationWorkflowToken } from "../src/server/integrations/github-notification-trigger";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
-import { POST as dispatchPOST } from "../app/api/internal/work-assignment-email/route";
+import { POST as dispatchPOST } from "../app/api/internal/work-assignment-notifications/route";
 
 test("work project validation rejects duplicate accounts and invalid statuses", () => {
   const member = randomUUID();
@@ -47,158 +47,253 @@ test("non-manager project listing is limited to the signed-in assignee", async (
   await listWorkProjects({ id: userId, email: "member@example.invalid", name: null, roles: [], permissions: new Set(["dashboard:read"]) });
 });
 
-test("assignment dispatcher sends to the assigned account and records provider acceptance", async (t) => {
+test("assignment phone numbers normalize to E.164 for SMS and WhatsApp", () => {
+  assert.equal(normalizeAssignmentPhone("024 123 4567"), "+233241234567");
+  assert.equal(normalizeAssignmentPhone("+1 (415) 555-2671"), "+14155552671");
+  assert.equal(normalizeAssignmentPhone("14155552671"), null);
+  assert.equal(normalizeAssignmentPhone("not a phone"), null);
+  assert.deepEqual(contactPhoneSchema.safeParse("024 123 4567"), {
+    success: true,
+    data: "+233241234567",
+  });
+  assert.equal(contactPhoneSchema.safeParse("not a phone").success, false);
+  assert.deepEqual(contactPhoneSchema.safeParse(""), { success: true, data: null });
+});
+
+test("assignment dispatcher sends both channels and retries only a failed channel", async (t) => {
   const notifications = prisma.workAssignmentNotification;
   const oldFetch = globalThis.fetch;
-  const oldUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  const oldSettings = {
-    apiKey: env.SENDGRID_API_KEY,
-    from: env.SENDGRID_FROM_EMAIL,
-    to: env.NOTIFICATION_TO_EMAIL,
-  };
+  const oldError = console.error;
+  const envKeys = [
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_SMS_FROM",
+    "TWILIO_WHATSAPP_FROM",
+    "TWILIO_WHATSAPP_CONTENT_SID",
+    "NEXT_PUBLIC_SITE_URL",
+  ] as const;
+  const oldEnv = envKeys.map((key) => process.env[key]);
   const originalMethods = {
     findMany: notifications.findMany,
     findUnique: notifications.findUnique,
     updateMany: notifications.updateMany,
   };
+  const states = { sms: "PENDING", whatsapp: "PENDING" };
+  const attempts = { sms: 0, whatsapp: 0 };
+  const nextAt = { sms: new Date(0), whatsapp: new Date(0) };
+  const requests: Array<{ url: string; fields: URLSearchParams; authorization: string | null }> = [];
+  let fetchCount = 0;
   t.after(() => {
     for (const [method, value] of Object.entries(originalMethods)) {
       Object.defineProperty(notifications, method, { configurable: true, value });
     }
     globalThis.fetch = oldFetch;
-    if (oldUrl === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
-    else process.env.NEXT_PUBLIC_SITE_URL = oldUrl;
-    env.SENDGRID_API_KEY = oldSettings.apiKey;
-    env.SENDGRID_FROM_EMAIL = oldSettings.from;
-    env.NOTIFICATION_TO_EMAIL = oldSettings.to;
+    console.error = oldError;
+    envKeys.forEach((key, index) => {
+      if (oldEnv[index] === undefined) delete process.env[key];
+      else process.env[key] = oldEnv[index];
+    });
   });
-  env.SENDGRID_API_KEY = "test-key";
-  env.SENDGRID_FROM_EMAIL = "sender@example.invalid";
-  env.NOTIFICATION_TO_EMAIL = "notifications@example.invalid";
+  process.env.TWILIO_ACCOUNT_SID = `AC${"a".repeat(32)}`;
+  process.env.TWILIO_AUTH_TOKEN = "private-test-token";
+  process.env.TWILIO_SMS_FROM = "+14155552671";
+  process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+14155552671";
+  process.env.TWILIO_WHATSAPP_CONTENT_SID = `HX${"b".repeat(32)}`;
   process.env.NEXT_PUBLIC_SITE_URL = "https://example.invalid";
-  const updates: Array<{ data: { status?: string; providerMessageId?: string | null } }> = [];
-  Object.defineProperty(notifications, "updateMany", { configurable: true, value: async (args: (typeof updates)[number]) => { updates.push(args); return { count: 1 }; } });
-  Object.defineProperty(notifications, "findMany", { configurable: true, value: async () => [{ id: "notification-id" }] });
-  Object.defineProperty(notifications, "findUnique", { configurable: true, value: async () => ({
-    id: "notification-id",
-    attemptCount: 1,
-    assignment: { user: { email: "member@example.invalid", isActive: true }, project: { title: "Work <Project>" } },
-  }) });
-  globalThis.fetch = async (_url, init) => {
-    const body = JSON.parse(String(init?.body)) as {
-      personalizations: Array<{ to: Array<{ email: string }> }>;
-      content: Array<{ value: string }>;
-    };
-    assert.equal(body.personalizations[0]?.to[0]?.email, "member@example.invalid");
-    assert.ok(body.content.some(({ value }) => value.includes("Work &lt;Project&gt;")));
-    return new Response(null, { status: 202, headers: { "x-message-id": "provider-id" } });
-  };
-  const counts = await dispatchWorkAssignmentEmails();
-  assert.equal(counts.accepted, 1);
-  assert.equal(updates.at(-1)?.data.status, "SENT");
-  assert.equal(updates.at(-1)?.data.providerMessageId, "provider-id");
-
-  globalThis.fetch = async () => new Response(null, { status: 503 });
-  const retryCounts = await dispatchWorkAssignmentEmails();
-  assert.equal(retryCounts.retried, 1);
-  assert.equal(updates.at(-1)?.data.status, "PENDING");
-});
-
-test("Gmail assignment messages address the member and encode project text safely", async (t) => {
-  const originalFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = originalFetch; });
-  globalThis.fetch = async (url, init) => {
-    assert.equal(String(url), "https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
-    const body = JSON.parse(String(init?.body)) as { raw: string };
-    const message = Buffer.from(body.raw, "base64url").toString("utf8");
-    assert.match(message, /To: member@example\.com\r\n/);
-    const content = message.split("\r\n\r\n")[1];
-    assert.ok(content);
-    const text = Buffer.from(content.replaceAll("\r\n", ""), "base64").toString("utf8");
-    assert.match(text, /Café project/);
-    assert.match(text, /https:\/\/example\.com\/admin\/work-projects/);
-    return Response.json({ id: "gmail-message-id" });
-  };
-  assert.equal(await sendGmailAssignment({
-    token: "test-token", from: "sender@example.com", to: "member@example.com",
-    title: "Café project", siteUrl: new URL("https://example.com"),
-  }), "gmail-message-id");
-  await assert.rejects(() => sendGmailAssignment({
-    token: "test-token", from: "sender@example.com", to: "bad@example.com\r\nBcc: other@example.com",
-    title: "Project", siteUrl: new URL("https://example.com"),
-  }), EmailDeliveryError);
-  globalThis.fetch = async () => new Response(null, { status: 429 });
-  await assert.rejects(() => sendGmailAssignment({
-    token: "test-token", from: "sender@example.com", to: "member@example.com",
-    title: "Project", siteUrl: new URL("https://example.com"),
-  }), (error: unknown) => error instanceof EmailDeliveryError && error.transient);
-});
-
-test("email trigger accepts only the configured signed GitHub workflow", async (t) => {
-  const oldId = process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID;
-  const oldRef = process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF;
-  t.after(() => {
-    if (oldId === undefined) delete process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID;
-    else process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID = oldId;
-    if (oldRef === undefined) delete process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF;
-    else process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF = oldRef;
+  console.error = () => undefined;
+  Object.defineProperty(notifications, "findMany", {
+    configurable: true,
+    value: async () => (states.sms === "PENDING" || states.whatsapp === "PENDING")
+      ? [{ id: "notification-id", smsAttemptCount: attempts.sms, whatsappAttemptCount: attempts.whatsapp }]
+      : [],
   });
-  process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID = "123";
-  process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/assignment-email.yml@refs/heads/main";
+  Object.defineProperty(notifications, "findUnique", {
+    configurable: true,
+    value: async (args: { select: Record<string, unknown> }) => {
+      if ("assignment" in args.select) {
+        return {
+          id: "notification-id",
+          smsStatus: states.sms,
+          smsNextAttemptAt: nextAt.sms,
+          whatsappStatus: states.whatsapp,
+          whatsappNextAttemptAt: nextAt.whatsapp,
+          assignment: {
+            user: {
+              phone: "024 123 4567",
+              isActive: true,
+              smsAlertsEnabled: true,
+              whatsappAlertsEnabled: true,
+            },
+            project: { title: "Work <Project>" },
+          },
+        };
+      }
+      return {
+        smsStatus: states.sms,
+        smsLastError: states.sms === "FAILED" ? "sms failed" : null,
+        whatsappStatus: states.whatsapp,
+        whatsappLastError: states.whatsapp === "FAILED" ? "whatsapp failed" : null,
+      };
+    },
+  });
+  Object.defineProperty(notifications, "updateMany", {
+    configurable: true,
+    value: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      const { where, data } = args;
+      if (where.smsStatus === "PENDING" && states.sms !== "PENDING") return { count: 0 };
+      if (where.whatsappStatus === "PENDING" && states.whatsapp !== "PENDING") return { count: 0 };
+      if (where.smsStatus === "PROCESSING" && states.sms !== "PROCESSING") return { count: 0 };
+      if (where.whatsappStatus === "PROCESSING" && states.whatsapp !== "PROCESSING") return { count: 0 };
+      if (typeof data.smsStatus === "string") states.sms = data.smsStatus;
+      if (typeof data.whatsappStatus === "string") states.whatsapp = data.whatsappStatus;
+      if ("smsAttemptCount" in data) attempts.sms += 1;
+      if ("whatsappAttemptCount" in data) attempts.whatsapp += 1;
+      if (data.smsNextAttemptAt instanceof Date) nextAt.sms = data.smsNextAttemptAt;
+      if (data.whatsappNextAttemptAt instanceof Date) nextAt.whatsapp = data.whatsappNextAttemptAt;
+      return { count: 1 };
+    },
+  });
+  globalThis.fetch = async (url, init) => {
+    const fields = new URLSearchParams(String(init?.body));
+    requests.push({
+      url: String(url),
+      fields,
+      authorization: new Headers(init?.headers).get("authorization"),
+    });
+    fetchCount += 1;
+    if (fetchCount === 1) return Response.json({ sid: `SM${"c".repeat(32)}` }, { status: 201 });
+    if (fetchCount === 2) return Response.json({ code: 30001 }, { status: 503 });
+    return Response.json({ sid: `SM${"d".repeat(32)}` }, { status: 201 });
+  };
+  const counts = await dispatchWorkAssignmentNotifications();
+  assert.deepEqual(counts, { accepted: 1, retried: 1, failed: 0, skipped: 0 });
+  assert.equal(states.sms, "SENT");
+  assert.equal(states.whatsapp, "PENDING");
+  assert.equal(requests[0]?.fields.get("To"), "+233241234567");
+  assert.match(requests[0]?.fields.get("Body") ?? "", /Work <Project>/);
+  assert.equal(requests[1]?.fields.get("To"), "whatsapp:+233241234567");
+  assert.equal(requests[1]?.fields.get("ContentSid"), process.env.TWILIO_WHATSAPP_CONTENT_SID);
+  assert.equal(requests[1]?.fields.get("ContentVariables"), JSON.stringify({
+    1: "Work <Project>",
+    2: "https://example.invalid/admin/work-projects",
+  }));
+  assert.match(requests[0]?.authorization ?? "", /^Basic /);
+
+  nextAt.whatsapp = new Date(0);
+  const retryCounts = await dispatchWorkAssignmentNotifications();
+  assert.deepEqual(retryCounts, { accepted: 1, retried: 0, failed: 0, skipped: 0 });
+  assert.equal(states.sms, "SENT");
+  assert.equal(states.whatsapp, "SENT");
+  assert.equal(requests.length, 3);
+});
+
+test("Twilio rejects permanent errors without marking acceptance", async (t) => {
+  const oldFetch = globalThis.fetch;
+  const keys = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_SMS_FROM", "TWILIO_WHATSAPP_FROM", "TWILIO_WHATSAPP_CONTENT_SID", "NEXT_PUBLIC_SITE_URL"] as const;
+  const oldEnv = keys.map((key) => process.env[key]);
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+    keys.forEach((key, index) => {
+      if (oldEnv[index] === undefined) delete process.env[key];
+      else process.env[key] = oldEnv[index];
+    });
+  });
+  process.env.TWILIO_ACCOUNT_SID = `AC${"a".repeat(32)}`;
+  process.env.TWILIO_AUTH_TOKEN = "private-test-token";
+  process.env.TWILIO_SMS_FROM = "+14155552671";
+  process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+14155552671";
+  process.env.TWILIO_WHATSAPP_CONTENT_SID = `HX${"b".repeat(32)}`;
+  process.env.NEXT_PUBLIC_SITE_URL = "https://example.invalid";
+  globalThis.fetch = async () => Response.json({ code: 20003 }, { status: 401 });
+  const sender = await createTwilioAssignmentSender();
+  await assert.rejects(
+    () => sender.sendSms("+14155552671", "Project"),
+    (error: unknown) => error instanceof DeliveryError && !error.transient,
+  );
+});
+
+test("notification trigger accepts only the configured signed GitHub workflow", async (t) => {
+  const oldId = process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID;
+  const oldRef = process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF;
+  t.after(() => {
+    if (oldId === undefined) delete process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID;
+    else process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID = oldId;
+    if (oldRef === undefined) delete process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF;
+    else process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF = oldRef;
+  });
+  process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID = "123";
+  process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/assignment-notifications.yml@refs/heads/main";
   const { publicKey, privateKey } = await generateKeyPair("RS256");
   const jwk = { ...await exportJWK(publicKey), kid: "test-key", alg: "RS256" };
   const keys = createLocalJWKSet({ keys: [jwk] });
   const makeToken = (claims: Record<string, string>) => new SignJWT({
     repository_id: "123",
-    workflow_ref: process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF,
+    workflow_ref: process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF,
     ref: "refs/heads/main",
     event_name: "schedule",
     ...claims,
   }).setProtectedHeader({ alg: "RS256", kid: "test-key" })
     .setIssuer("https://token.actions.githubusercontent.com")
-    .setAudience("webnex-work-assignment-email")
+    .setAudience("webnex-work-assignment-notifications")
     .setSubject("test")
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(privateKey);
-  assert.equal(await verifyEmailWorkflowToken(await makeToken({}), keys), true);
-  assert.equal(await verifyEmailWorkflowToken(await makeToken({ repository_id: "456" }), keys), false);
-  assert.equal(await verifyEmailWorkflowToken(await makeToken({ workflow_ref: "owner/repo/.github/workflows/other.yml@refs/heads/main" }), keys), false);
-  assert.equal(await verifyEmailWorkflowToken(await makeToken({ ref: "refs/heads/other" }), keys), false);
-  assert.equal(await verifyEmailWorkflowToken(await makeToken({ event_name: "pull_request" }), keys), false);
-  await assert.rejects(() => verifyEmailWorkflowToken("invalid-token", keys));
+  assert.equal(await verifyNotificationWorkflowToken(await makeToken({}), keys), true);
+  assert.equal(await verifyNotificationWorkflowToken(await makeToken({ repository_id: "456" }), keys), false);
+  assert.equal(await verifyNotificationWorkflowToken(await makeToken({ workflow_ref: "owner/repo/.github/workflows/other.yml@refs/heads/main" }), keys), false);
+  assert.equal(await verifyNotificationWorkflowToken(await makeToken({ ref: "refs/heads/other" }), keys), false);
+  assert.equal(await verifyNotificationWorkflowToken(await makeToken({ event_name: "pull_request" }), keys), false);
+  await assert.rejects(() => verifyNotificationWorkflowToken("invalid-token", keys));
 });
 
-test("disabled or unauthenticated email triggers do not dispatch", async (t) => {
-  const keys = ["WORK_ASSIGNMENT_EMAIL_PROVIDER", "EMAIL_DISPATCH_GITHUB_REPOSITORY_ID", "EMAIL_DISPATCH_GITHUB_WORKFLOW_REF"] as const;
+test("disabled or unauthenticated notification triggers do not dispatch", async (t) => {
+  const keys = [
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_SMS_FROM",
+    "TWILIO_WHATSAPP_FROM",
+    "TWILIO_WHATSAPP_CONTENT_SID",
+    "NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID",
+    "NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF",
+  ] as const;
   const old = keys.map((key) => process.env[key]);
   t.after(() => keys.forEach((key, index) => {
     if (old[index] === undefined) delete process.env[key];
     else process.env[key] = old[index];
   }));
-  delete process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER;
+  keys.forEach((key) => delete process.env[key]);
   assert.equal((await dispatchPOST(new Request("https://example.com", { method: "POST" }))).status, 503);
-  process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER = "gmail";
-  process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID = "123";
-  process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF = "workflow";
+  process.env.TWILIO_ACCOUNT_SID = `AC${"a".repeat(32)}`;
+  process.env.TWILIO_AUTH_TOKEN = "test-token";
+  process.env.TWILIO_SMS_FROM = "+14155552671";
+  process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+14155552671";
+  process.env.TWILIO_WHATSAPP_CONTENT_SID = `HX${"b".repeat(32)}`;
+  process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID = "123";
+  process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF = "workflow";
   assert.equal((await dispatchPOST(new Request("https://example.com", { method: "POST" }))).status, 401);
   assert.equal((await dispatchPOST(new Request("https://example.com", {
     method: "POST", headers: { authorization: "Bearer invalid" },
   }))).status, 401);
 });
 
-test("missing Gmail configuration leaves the assignment queue untouched", async (t) => {
-  const provider = process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER;
-  const clientId = process.env.GMAIL_CLIENT_ID;
+test("missing Twilio settings fail before reading the notification queue", async (t) => {
+  const old = process.env.TWILIO_ACCOUNT_SID;
+  const notifications = prisma.workAssignmentNotification;
+  const originalFindMany = notifications.findMany;
+  let queried = false;
   t.after(() => {
-    if (provider === undefined) delete process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER;
-    else process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER = provider;
-    if (clientId === undefined) delete process.env.GMAIL_CLIENT_ID;
-    else process.env.GMAIL_CLIENT_ID = clientId;
+    if (old === undefined) delete process.env.TWILIO_ACCOUNT_SID;
+    else process.env.TWILIO_ACCOUNT_SID = old;
+    Object.defineProperty(notifications, "findMany", { configurable: true, value: originalFindMany });
   });
-  process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER = "gmail";
-  delete process.env.GMAIL_CLIENT_ID;
-  await assert.rejects(() => dispatchWorkAssignmentEmails(), /Gmail assignment email settings/);
+  delete process.env.TWILIO_ACCOUNT_SID;
+  Object.defineProperty(notifications, "findMany", {
+    configurable: true,
+    value: async () => { queried = true; return []; },
+  });
+  await assert.rejects(() => dispatchWorkAssignmentNotifications(), /Twilio SMS and WhatsApp assignment alert settings/);
+  assert.equal(queried, false);
 });
 
 test("work assignments, isolation and notifications persist in isolated PostgreSQL", {
@@ -233,6 +328,11 @@ test("work assignments, isolation and notifications persist in isolated PostgreS
     projectId = savedId;
     assert.equal(created.queued, 1);
     assert.equal(await prisma.workAssignmentNotification.count({ where: { assignment: { projectId: savedId } } }), 1);
+    const queuedNotification = await prisma.workAssignmentNotification.findFirst({
+      where: { assignment: { projectId: savedId } },
+      select: { smsStatus: true, whatsappStatus: true },
+    });
+    assert.deepEqual(queuedNotification, { smsStatus: "PENDING", whatsappStatus: "PENDING" });
     const unchanged = await saveWorkProject(savedId, input, manager.id);
     assert.ok("id" in unchanged);
     assert.equal(unchanged.queued, 0);

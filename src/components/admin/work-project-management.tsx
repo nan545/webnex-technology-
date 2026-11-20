@@ -12,11 +12,31 @@ type Project = {
   status: string;
   assignments?: {
     userId: string;
-    user: { name: string | null; email: string; isActive: boolean };
-    notification: { status: string; lastError: string | null } | null;
+    user: {
+      name: string | null;
+      email: string;
+      isActive: boolean;
+      hasPhone: boolean;
+      smsAlertsEnabled: boolean;
+      whatsappAlertsEnabled: boolean;
+    };
+    notification: {
+      status: string;
+      smsStatus: string;
+      smsLastError: string | null;
+      whatsappStatus: string;
+      whatsappLastError: string | null;
+    } | null;
   }[];
 };
-type User = { id: string; name: string | null; email: string };
+type User = {
+  id: string;
+  name: string | null;
+  email: string;
+  hasPhone: boolean;
+  smsAlertsEnabled: boolean;
+  whatsappAlertsEnabled: boolean;
+};
 const empty: WorkProjectInput = { title: "", description: "", status: "NOT_STARTED", assigneeIds: [] };
 const statuses = [
   ["NOT_STARTED", "Not started"],
@@ -64,7 +84,7 @@ export function WorkProjectManagement({ projects, users, canManage }: {
       const result: { data: { id: string; queued: number } } = await response.json();
       setId(result.data.id);
       setMessage(result.data.queued
-        ? `Project saved. ${result.data.queued} assignment email(s) queued; delivery requires the configured email dispatcher.`
+        ? `Project saved. ${result.data.queued} assignment notification(s) queued for SMS and WhatsApp.`
         : "Project saved.");
       router.refresh();
     } catch (cause) {
@@ -91,7 +111,15 @@ export function WorkProjectManagement({ projects, users, canManage }: {
           <p className="font-medium">Assigned accounts</p>
           {project.assignments?.length ? <ul className="mt-2 space-y-1">
             {project.assignments.map((assignment) => <li key={assignment.userId}>
-              {assignment.user.name || assignment.user.email} ({assignment.user.email}){!assignment.user.isActive ? " — inactive" : ""} · Email: {assignment.notification?.status === "SENT" ? "accepted by provider" : assignment.notification?.status.toLowerCase() ?? "not queued"}{assignment.notification?.lastError ? ` — ${assignment.notification.lastError}` : ""}
+              <span>{assignment.user.name || assignment.user.email} ({assignment.user.email}){!assignment.user.isActive ? " — inactive" : ""}</span>
+              <span className="block text-xs text-muted">
+                SMS: {assignment.notification?.smsStatus.toLowerCase() ?? "not queued"}
+                {assignment.notification?.smsLastError ? ` — ${assignment.notification.smsLastError}` : ""}
+              </span>
+              <span className="block text-xs text-muted">
+                WhatsApp: {assignment.notification?.whatsappStatus.toLowerCase() ?? "not queued"}
+                {assignment.notification?.whatsappLastError ? ` — ${assignment.notification.whatsappLastError}` : ""}
+              </span>
             </li>)}
           </ul> : <p className="mt-1 text-muted">No one assigned.</p>}
         </div> : null}
@@ -106,10 +134,15 @@ export function WorkProjectManagement({ projects, users, canManage }: {
         if (status) setForm({ ...form, status });
       }}>{statuses.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       <fieldset><legend className="field-label">Assign team accounts</legend>
-        <p className="mb-2 text-xs text-muted">Team members must have an active administrator login. Profile entries alone cannot sign in.</p>
+        <p className="mb-2 text-xs text-muted">Team members need an active login, a phone number and consent recorded for SMS and WhatsApp. Manage contact settings under Users and roles.</p>
         {users.length ? <div className="max-h-64 space-y-2 overflow-auto">{users.map((user) => <label className="flex items-center gap-2 text-sm" key={user.id}>
           <input type="checkbox" checked={form.assigneeIds.includes(user.id)} onChange={(event) => setForm({ ...form, assigneeIds: event.target.checked ? [...form.assigneeIds, user.id] : form.assigneeIds.filter((value) => value !== user.id) })} />
-          {user.name || user.email} ({user.email})
+          <span>
+            {user.name || user.email} ({user.email})
+            <span className="block text-xs text-muted">
+              {!user.hasPhone ? "No phone number" : user.smsAlertsEnabled && user.whatsappAlertsEnabled ? "SMS and WhatsApp ready" : "Alert consent incomplete"}
+            </span>
+          </span>
         </label>)}</div> : <p className="text-sm text-muted">No eligible active accounts.</p>}
         {form.assigneeIds.filter((userId) => !users.some((user) => user.id === userId)).map((userId) => <label className="mt-2 flex items-center gap-2 text-sm" key={userId}>
           <input type="checkbox" checked onChange={() => setForm({ ...form, assigneeIds: form.assigneeIds.filter((value) => value !== userId) })} />

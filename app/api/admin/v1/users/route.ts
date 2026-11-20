@@ -1,5 +1,6 @@
 import { hash } from "bcryptjs";
 import { z } from "zod";
+import { contactPhoneSchema } from "@/lib/validation/contact-phone";
 import { roleKeySchema } from "@/lib/validation/roles";
 import { readBoundedJson } from "@/server/api/bounded-json";
 import { apiError, apiSuccess, handleApiFailure, parsePagination } from "@/server/api/response";
@@ -10,12 +11,19 @@ import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 const createUserSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(254).transform((email) => email.toLowerCase()),
+  phone: contactPhoneSchema.optional(),
+  smsAlertsEnabled: z.boolean().default(false),
+  whatsappAlertsEnabled: z.boolean().default(false),
   password: z
     .string()
     .min(12)
     .max(72)
     .refine((value) => Buffer.byteLength(value, "utf8") <= 72),
   roleKey: roleKeySchema,
+}).superRefine((value, context) => {
+  if ((value.smsAlertsEnabled || value.whatsappAlertsEnabled) && !value.phone) {
+    context.addIssue({ code: "custom", path: ["phone"], message: "A phone number is required to enable message alerts." });
+  }
 });
 
 export async function GET(request: Request) {
@@ -34,6 +42,9 @@ export async function GET(request: Request) {
           id: true,
           name: true,
           email: true,
+          phone: true,
+          smsAlertsEnabled: true,
+          whatsappAlertsEnabled: true,
           isActive: true,
           lastLoginAt: true,
           createdAt: true,
@@ -87,6 +98,9 @@ export async function POST(request: Request) {
         data: {
           name: input.data.name,
           email: input.data.email,
+          phone: input.data.phone ?? null,
+          smsAlertsEnabled: input.data.smsAlertsEnabled,
+          whatsappAlertsEnabled: input.data.whatsappAlertsEnabled,
           passwordHash,
           roles: { create: { roleId: role.id } },
         },

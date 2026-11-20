@@ -20,7 +20,8 @@
     "db:check": "node --conditions=react-server --import dotenv/config --import tsx scripts/check-database.ts",
     "admin:bootstrap": "node --conditions=react-server --import dotenv/config --import tsx scripts/bootstrap-super-admin.ts",
     "admin:reset-password": "node --conditions=react-server --import dotenv/config --import tsx scripts/reset-admin-password.ts",
-    "email:dispatch": "node --conditions=react-server --import dotenv/config --import tsx scripts/dispatch-email-outbox.ts"
+    "email:dispatch": "node --conditions=react-server --import dotenv/config --import tsx scripts/dispatch-email-outbox.ts",
+    "assignment-alerts:dispatch": "node --conditions=react-server --import dotenv/config --import tsx scripts/dispatch-work-assignment-notifications.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1167.0",
@@ -28,7 +29,6 @@
     "@prisma/client": "7.10.1",
     "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.10",
-    "google-auth-library": "^11.3.4",
     "jose": "^6.2.18",
     "lucide-react": "^1.71.0",
     "next": "16.4.6",

@@ -1,22 +1,26 @@
-import { verifyEmailWorkflowToken } from "@/server/integrations/github-email-trigger";
-import { dispatchWorkAssignmentEmails } from "@/server/integrations/work-assignment-email";
+import { verifyNotificationWorkflowToken } from "@/server/integrations/github-notification-trigger";
+import { dispatchWorkAssignmentNotifications } from "@/server/integrations/work-assignment-notifications";
 import { errors } from "jose";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  if (process.env.WORK_ASSIGNMENT_EMAIL_PROVIDER !== "gmail"
-    || !process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID
-    || !process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF) {
-    return Response.json({ error: "Email dispatch is not configured." }, { status: 503 });
+  if (!process.env.TWILIO_ACCOUNT_SID
+    || !process.env.TWILIO_AUTH_TOKEN
+    || !process.env.TWILIO_SMS_FROM
+    || !process.env.TWILIO_WHATSAPP_FROM
+    || !process.env.TWILIO_WHATSAPP_CONTENT_SID
+    || !process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID
+    || !process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF) {
+    return Response.json({ error: "Message dispatch is not configured." }, { status: 503 });
   }
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ") || authorization.length > 10_000) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
   try {
-    if (!await verifyEmailWorkflowToken(authorization.slice(7))) {
+    if (!await verifyNotificationWorkflowToken(authorization.slice(7))) {
       return Response.json({ error: "Unauthorized." }, { status: 401 });
     }
   } catch (error) {
@@ -33,10 +37,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Workflow identity verification unavailable." }, { status: 503 });
   }
   try {
-    const counts = await dispatchWorkAssignmentEmails(10);
+    const counts = await dispatchWorkAssignmentNotifications(10);
     return Response.json(counts, { status: counts.failed || counts.retried ? 503 : 200 });
   } catch (error) {
-    console.error("Assignment email dispatch failed:", error instanceof Error ? error.message : "unknown error");
-    return Response.json({ error: "Assignment email dispatch failed; check server logs." }, { status: 503 });
+    console.error("Assignment message dispatch failed:", error instanceof Error ? error.message : "unknown error");
+    return Response.json({ error: "Assignment message dispatch failed; check server logs." }, { status: 503 });
   }
 }

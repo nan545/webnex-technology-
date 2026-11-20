@@ -13,19 +13,50 @@ export async function listWorkProjects(admin: AdminContext) {
       select,
     });
   }
-  return prisma.workProject.findMany({
+  const projects = await prisma.workProject.findMany({
     orderBy: { updatedAt: "desc" },
     select: {
       ...select,
       assignments: {
         select: {
           userId: true,
-          user: { select: { name: true, email: true, isActive: true } },
-          notification: { select: { status: true, lastError: true } },
+          user: {
+            select: {
+              name: true,
+              email: true,
+              isActive: true,
+              phone: true,
+              smsAlertsEnabled: true,
+              whatsappAlertsEnabled: true,
+            },
+          },
+          notification: {
+            select: {
+              status: true,
+              smsStatus: true,
+              smsLastError: true,
+              whatsappStatus: true,
+              whatsappLastError: true,
+            },
+          },
         },
       },
     },
   });
+  return projects.map(({ assignments, ...project }) => ({
+    ...project,
+    assignments: assignments.map(({ user, ...assignment }) => ({
+      ...assignment,
+      user: {
+        name: user.name,
+        email: user.email,
+        isActive: user.isActive,
+        hasPhone: Boolean(user.phone),
+        smsAlertsEnabled: user.smsAlertsEnabled,
+        whatsappAlertsEnabled: user.whatsappAlertsEnabled,
+      },
+    })),
+  }));
 }
 
 export async function saveWorkProject(id: string | null, input: WorkProjectInput, actorId: string) {

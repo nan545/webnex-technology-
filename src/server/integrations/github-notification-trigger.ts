@@ -3,13 +3,13 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 
 const githubKeys = createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"));
 const issuer = "https://token.actions.githubusercontent.com";
-const audience = "webnex-work-assignment-email";
+const audience = "webnex-work-assignment-notifications";
 
-export async function verifyEmailWorkflowToken(token: string, key: JWTVerifyGetKey = githubKeys) {
-  const repositoryId = process.env.EMAIL_DISPATCH_GITHUB_REPOSITORY_ID;
-  const workflowRef = process.env.EMAIL_DISPATCH_GITHUB_WORKFLOW_REF;
+export async function verifyNotificationWorkflowToken(token: string, key: JWTVerifyGetKey = githubKeys) {
+  const repositoryId = process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID;
+  const workflowRef = process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF;
   if (!repositoryId || !/^\d+$/.test(repositoryId) || !workflowRef) {
-    throw new Error("Email dispatch workflow identity is not configured.");
+    throw new Error("Notification dispatch workflow identity is not configured.");
   }
   const { payload } = await jwtVerify(token, key, {
     issuer,

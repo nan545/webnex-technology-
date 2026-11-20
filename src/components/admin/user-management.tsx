@@ -1,13 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { Fragment, useState, type FormEvent } from "react";
 import { errorMessage } from "@/lib/api/error-message";
 
 type AdminUserRow = {
   id: string;
   name: string | null;
   email: string;
+  phone: string | null;
+  smsAlertsEnabled: boolean;
+  whatsappAlertsEnabled: boolean;
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -36,6 +39,9 @@ export function UserManagement({
     builtInRoleKeys.includes(role.key) ? role.key.replaceAll("_", " ") : role.name;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [smsAlertsEnabled, setSmsAlertsEnabled] = useState(false);
+  const [whatsappAlertsEnabled, setWhatsappAlertsEnabled] = useState(false);
   const [password, setPassword] = useState("");
   const [roleKey, setRoleKey] = useState(roles.find((role) => role.key === "EDITOR")?.key ?? "");
   const [error, setError] = useState("");
@@ -45,6 +51,10 @@ export function UserManagement({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [contactUserId, setContactUserId] = useState<string | null>(null);
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactSmsEnabled, setContactSmsEnabled] = useState(false);
+  const [contactWhatsappEnabled, setContactWhatsappEnabled] = useState(false);
 
   function closeReset() {
     setResetUser(null);
@@ -88,16 +98,52 @@ export function UserManagement({
       const response = await fetch("/api/admin/v1/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, roleKey }),
+        body: JSON.stringify({ name, email, password, roleKey, phone, smsAlertsEnabled, whatsappAlertsEnabled }),
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       setName("");
       setEmail("");
+      setPhone("");
       setPassword("");
+      setSmsAlertsEnabled(false);
+      setWhatsappAlertsEnabled(false);
       setMessage("Administrator account created.");
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to create account.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function editContact(user: AdminUserRow) {
+    setContactUserId(user.id);
+    setContactPhone(user.phone ?? "");
+    setContactSmsEnabled(user.smsAlertsEnabled);
+    setContactWhatsappEnabled(user.whatsappAlertsEnabled);
+  }
+
+  async function saveContact(event: FormEvent<HTMLFormElement>, user: AdminUserRow) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/v1/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: contactPhone,
+          smsAlertsEnabled: contactSmsEnabled,
+          whatsappAlertsEnabled: contactWhatsappEnabled,
+        }),
+      });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      setContactUserId(null);
+      setMessage("Message alert contact settings saved. Failed alerts for active assignments were requeued where eligible.");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to update message alert settings.");
     } finally {
       setSaving(false);
     }
@@ -141,10 +187,21 @@ export function UserManagement({
           <input className="field-control" autoComplete="email" id="new-admin-email" maxLength={254} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
         </div>
         <div>
+          <label className="field-label" htmlFor="new-admin-phone">Mobile number</label>
+          <input className="field-control" autoComplete="tel" id="new-admin-phone" maxLength={40} onChange={(event) => setPhone(event.target.value)} required={smsAlertsEnabled || whatsappAlertsEnabled} type="tel" value={phone} />
+          <p className="mt-1 text-xs text-muted">Use international format, e.g. +233…</p>
+        </div>
+        <div>
           <label className="field-label" htmlFor="new-admin-password">Initial password</label>
           <input className="field-control" autoComplete="new-password" id="new-admin-password" maxLength={72} minLength={12} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />
           <p className="mt-1 text-xs text-muted">12–72 UTF-8 bytes. Share it securely; self-service password changes are not yet available.</p>
         </div>
+        <fieldset className="space-y-2 sm:col-span-2">
+          <legend className="field-label">Project assignment alerts</legend>
+          <p className="text-xs text-muted">Only enable a channel after the account holder has agreed to receive project alerts there.</p>
+          <label className="flex items-center gap-2 text-sm"><input checked={smsAlertsEnabled} onChange={(event) => setSmsAlertsEnabled(event.target.checked)} type="checkbox" />SMS alerts consent recorded</label>
+          <label className="flex items-center gap-2 text-sm"><input checked={whatsappAlertsEnabled} onChange={(event) => setWhatsappAlertsEnabled(event.target.checked)} type="checkbox" />WhatsApp alerts consent recorded</label>
+        </fieldset>
         <div>
           <label className="field-label" htmlFor="new-admin-role">Role</label>
           <select className="field-control" id="new-admin-role" onChange={(event) => setRoleKey(event.target.value)} required value={roleKey}>
@@ -169,6 +226,7 @@ export function UserManagement({
                 <tr>
                   <th className="px-4 py-3 font-medium">Administrator</th>
                   <th className="px-4 py-3 font-medium">Role</th>
+                  <th className="px-4 py-3 font-medium">Project alerts</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Last sign-in</th>
                   <th className="px-4 py-3 font-medium">Actions</th>
@@ -176,7 +234,8 @@ export function UserManagement({
               </thead>
               <tbody className="divide-y divide-border">
                 {users.map((user) => (
-                  <tr key={user.id}>
+                  <Fragment key={user.id}>
+                  <tr>
                     <td className="px-4 py-4">
                       <p className="font-medium">{user.name ?? "Name not set"}</p>
                       <p className="mt-1 text-xs text-muted">{user.email}</p>
@@ -192,6 +251,17 @@ export function UserManagement({
                         {!user.roleKey ? <option value="">No role assigned</option> : null}
                         {roleOptions.map((role) => <option key={role.key} value={role.key}>{roleLabel(role)}</option>)}
                       </select>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p>SMS: {user.smsAlertsEnabled ? "on" : "off"}</p>
+                      <p>WhatsApp: {user.whatsappAlertsEnabled ? "on" : "off"}</p>
+                      <p className="mt-1 text-xs text-muted">{user.phone || "No phone number"}</p>
+                      <button
+                        className="mt-2 min-h-9 border border-border px-3 text-xs font-medium hover:border-blue-700 hover:text-blue-700"
+                        disabled={saving}
+                        onClick={() => editContact(user)}
+                        type="button"
+                      >Edit phone and consent</button>
                     </td>
                     <td className="px-4 py-4">{user.isActive ? "Active" : "Disabled"}</td>
                     <td className="px-4 py-4 text-muted">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString("en-GH") : "Never"}</td>
@@ -218,6 +288,21 @@ export function UserManagement({
                       )}
                     </td>
                   </tr>
+                  {contactUserId === user.id ? <tr key={`${user.id}-alerts`}>
+                    <td className="px-4 py-4" colSpan={6}>
+                      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => void saveContact(event, user)}>
+                        <label className="block"><span className="field-label">Mobile number for SMS and WhatsApp</span><input autoComplete="tel" className="field-control" maxLength={40} onChange={(event) => setContactPhone(event.target.value)} required={contactSmsEnabled || contactWhatsappEnabled} type="tel" value={contactPhone} /></label>
+                        <fieldset className="space-y-2">
+                          <legend className="field-label">Confirmed consent</legend>
+                          <label className="flex items-center gap-2 text-sm"><input checked={contactSmsEnabled} onChange={(event) => setContactSmsEnabled(event.target.checked)} type="checkbox" />SMS alerts enabled</label>
+                          <label className="flex items-center gap-2 text-sm"><input checked={contactWhatsappEnabled} onChange={(event) => setContactWhatsappEnabled(event.target.checked)} type="checkbox" />WhatsApp alerts enabled</label>
+                        </fieldset>
+                        <div className="flex gap-2 sm:col-span-2"><button className="button-primary" disabled={saving} type="submit">{saving ? "Saving…" : "Save alert settings"}</button><button className="button-secondary" disabled={saving} onClick={() => setContactUserId(null)} type="button">Cancel</button></div>
+                        <p className="text-xs text-muted sm:col-span-2">Do not enable a channel unless the account holder has explicitly agreed to receive project assignment alerts there. Saving can requeue eligible failed alerts for current assignments.</p>
+                      </form>
+                    </td>
+                  </tr> : null}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

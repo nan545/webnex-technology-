@@ -76,6 +76,9 @@ model User {
   id                  String    @id @default(uuid()) @db.Uuid
   name                String?
   email               String    @unique
+  phone                 String?   @db.VarChar(40)
+  smsAlertsEnabled      Boolean   @default(false)
+  whatsappAlertsEnabled Boolean   @default(false)
   emailVerified       DateTime?
   image               String?
   passwordHash        String?
@@ -388,12 +391,26 @@ model WorkAssignmentNotification {
   lastError         String?            @db.VarChar(500)
   sentAt            DateTime?
   providerMessageId String?            @db.VarChar(200)
+  smsStatus             NotificationStatus @default(PENDING)
+  smsAttemptCount       Int                @default(0)
+  smsNextAttemptAt      DateTime           @default(now())
+  smsLastError          String?            @db.VarChar(500)
+  smsSentAt             DateTime?
+  smsMessageId          String?            @db.VarChar(200)
+  whatsappStatus        NotificationStatus @default(PENDING)
+  whatsappAttemptCount  Int                @default(0)
+  whatsappNextAttemptAt DateTime           @default(now())
+  whatsappLastError     String?            @db.VarChar(500)
+  whatsappSentAt        DateTime?
+  whatsappMessageId     String?            @db.VarChar(200)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
   assignment WorkProjectAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
   @@index([status, nextAttemptAt])
+  @@index([smsStatus, smsNextAttemptAt])
+  @@index([whatsappStatus, whatsappNextAttemptAt])
 }
 
 model CaseStudy {

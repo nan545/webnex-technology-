@@ -153,6 +153,12 @@ Twilio credentials are required, and WhatsApp business-initiated notifications r
 
 The manager page shows SMS and WhatsApp queue status independently. A Twilio API acceptance is not proof of handset delivery. Partial failures retry only the failed channel, up to five attempts; changing an account's phone or consent requeues eligible failed alerts for active assignments without resending channels already accepted. Twilio charges for usage; fees and availability depend on destination country, sender type, and WhatsApp/Meta pricing. GitHub schedules can be delayed or disabled after repository inactivity, and Render's free service can sleep. Monitor GitHub runs, Render logs, and queue status; confirm receipt on a real device before relying on alerts. Enquiry notification emails remain on their separate SendGrid integration.
 
+### Invoices
+
+Administrators with `proposals:manage` can use **Invoices** to create and edit draft invoices, record issue/paid/void status, search and filter the latest 100 records, and print an invoice or save it as PDF from the browser. Client and billing details are entered manually. Invoices support GHS and USD, up to 40 line items, and a per-invoice tax rate that defaults to 0%; the server calculates and persists rounded totals. Drafts are editable; issued invoices cannot be edited. Overdue status is derived from the due date and is not a payment reminder.
+
+Invoice numbers use an atomic per-year database counter; changing the issue year on a draft reserves a new number. Apply the `20261120193000_invoices` migration with `npm run db:deploy` before opening the page in an environment using the existing database. Marking an invoice paid is a manual record only; email delivery, online payments, partial payments, and configurable seller address/tax-registration details are not implemented. Print output currently identifies the seller as WEBNEX Technologies.
+
 Apply the `20261115140000_publication_cover_images` migration before deploying code that reads the new image relationships. Review and back up the target database first. Existing records with unsupported content formats or workflow statuses are listed in the admin interface for manual review and are not editable there. Published records with unsupported content are omitted from the new public pages and logged; their data is not changed. Review these records before deployment. Draft cover images are not publicly accessible.
 
 ## Phase 3 API

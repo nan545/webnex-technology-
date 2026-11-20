@@ -144,3 +144,30 @@ html {
 .field-control[aria-invalid="true"] {
   border-color: #b42318;
 }
+
+@media print {
+  @page {
+    margin: 18mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .invoice-print-view,
+  .invoice-print-view * {
+    visibility: visible !important;
+  }
+
+  .invoice-print-view {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: white;
+    color: #10233f;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

@@ -11,6 +11,7 @@ const activeNavigation = [
   { href: "/admin/pipeline", label: "Sales pipeline", permission: "enquiries:read" },
   { href: "/admin/follow-ups", label: "Follow-ups", permission: "enquiries:read" },
   { href: "/admin/proposals", label: "Proposals", permission: "proposals:manage" },
+  { href: "/admin/invoices", label: "Invoices", permission: "proposals:manage" },
   { href: "/admin/integrations", label: "Integrations", permission: "settings:manage" },
   { href: "/admin/services", label: "Services", permission: "content:read" },
   { href: "/admin/work-projects", label: "Work projects", permission: "dashboard:read" },

@@ -8,9 +8,9 @@ import { listWorkProjects, saveWorkProject } from "../src/server/content/work-pr
 import { prisma } from "../src/server/db";
 import { dispatchWorkAssignmentNotifications } from "../src/server/integrations/work-assignment-notifications";
 import { DeliveryError } from "../src/server/integrations/delivery-error";
-import { createTwilioAssignmentSender, normalizeAssignmentPhone } from "../src/server/integrations/twilio-assignment-alerts";
+import { createVonageAssignmentSender, normalizeAssignmentPhone } from "../src/server/integrations/vonage-assignment-alerts";
 import { verifyNotificationWorkflowToken } from "../src/server/integrations/github-notification-trigger";
-import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
+import { createLocalJWKSet, exportJWK, exportPKCS8, generateKeyPair, SignJWT } from "jose";
 import { POST as dispatchPOST } from "../app/api/internal/work-assignment-notifications/route";
 
 test("work project validation rejects duplicate accounts and invalid statuses", () => {
@@ -65,11 +65,14 @@ test("assignment dispatcher sends both channels and retries only a failed channe
   const oldFetch = globalThis.fetch;
   const oldError = console.error;
   const envKeys = [
-    "TWILIO_ACCOUNT_SID",
-    "TWILIO_AUTH_TOKEN",
-    "TWILIO_SMS_FROM",
-    "TWILIO_WHATSAPP_FROM",
-    "TWILIO_WHATSAPP_CONTENT_SID",
+    "VONAGE_API_KEY",
+    "VONAGE_API_SECRET",
+    "VONAGE_SMS_FROM",
+    "VONAGE_APPLICATION_ID",
+    "VONAGE_PRIVATE_KEY",
+    "VONAGE_WHATSAPP_FROM",
+    "VONAGE_WHATSAPP_TEMPLATE_NAME",
+    "VONAGE_WHATSAPP_TEMPLATE_LOCALE",
     "NEXT_PUBLIC_SITE_URL",
   ] as const;
   const oldEnv = envKeys.map((key) => process.env[key]);
@@ -94,11 +97,15 @@ test("assignment dispatcher sends both channels and retries only a failed channe
       else process.env[key] = oldEnv[index];
     });
   });
-  process.env.TWILIO_ACCOUNT_SID = `AC${"a".repeat(32)}`;
-  process.env.TWILIO_AUTH_TOKEN = "private-test-token";
-  process.env.TWILIO_SMS_FROM = "+14155552671";
-  process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+14155552671";
-  process.env.TWILIO_WHATSAPP_CONTENT_SID = `HX${"b".repeat(32)}`;
+  process.env.VONAGE_API_KEY = "abcdef";
+  process.env.VONAGE_API_SECRET = "private-test-secret";
+  process.env.VONAGE_SMS_FROM = "WEBNEX";
+  process.env.VONAGE_APPLICATION_ID = "vonage-app-id";
+  const { privateKey } = await generateKeyPair("RS256", { extractable: true });
+  process.env.VONAGE_PRIVATE_KEY = await exportPKCS8(privateKey);
+  process.env.VONAGE_WHATSAPP_FROM = "+14155552671";
+  process.env.VONAGE_WHATSAPP_TEMPLATE_NAME = "work_assignment";
+  process.env.VONAGE_WHATSAPP_TEMPLATE_LOCALE = "en_US";
   process.env.NEXT_PUBLIC_SITE_URL = "https://example.invalid";
   console.error = () => undefined;
   Object.defineProperty(notifications, "findMany", {
@@ -154,30 +161,34 @@ test("assignment dispatcher sends both channels and retries only a failed channe
     },
   });
   globalThis.fetch = async (url, init) => {
-    const fields = new URLSearchParams(String(init?.body));
-    requests.push({
-      url: String(url),
-      fields,
-      authorization: new Headers(init?.headers).get("authorization"),
-    });
+    const contentType = new Headers(init?.headers).get("content-type");
+    const fields = contentType?.includes("application/json")
+      ? new URLSearchParams()
+      : new URLSearchParams(String(init?.body));
+    if (contentType?.includes("application/json")) {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(body)) {
+        if (typeof value === "string") fields.set(key, value);
+      }
+    }
+    requests.push({ url: String(url), fields, authorization: new Headers(init?.headers).get("authorization") });
     fetchCount += 1;
-    if (fetchCount === 1) return Response.json({ sid: `SM${"c".repeat(32)}` }, { status: 201 });
-    if (fetchCount === 2) return Response.json({ code: 30001 }, { status: 503 });
-    return Response.json({ sid: `SM${"d".repeat(32)}` }, { status: 201 });
+    if (String(url).includes("rest.nexmo.com")) {
+      if (fetchCount === 1) return Response.json({ messages: [{ status: "0", "message-id": "vonage-sms-1" }] }, { status: 200 });
+      return Response.json({ messages: [{ status: "0", "message-id": "vonage-sms-2" }] }, { status: 200 });
+    }
+    if (fetchCount === 2) return Response.json({ title: "Transient", detail: "Temporary error" }, { status: 503 });
+    return Response.json({ message_uuid: `whatsapp-${fetchCount}` }, { status: 202 });
   };
   const counts = await dispatchWorkAssignmentNotifications();
   assert.deepEqual(counts, { accepted: 1, retried: 1, failed: 0, skipped: 0 });
   assert.equal(states.sms, "SENT");
   assert.equal(states.whatsapp, "PENDING");
-  assert.equal(requests[0]?.fields.get("To"), "+233241234567");
-  assert.match(requests[0]?.fields.get("Body") ?? "", /Work <Project>/);
-  assert.equal(requests[1]?.fields.get("To"), "whatsapp:+233241234567");
-  assert.equal(requests[1]?.fields.get("ContentSid"), process.env.TWILIO_WHATSAPP_CONTENT_SID);
-  assert.equal(requests[1]?.fields.get("ContentVariables"), JSON.stringify({
-    1: "Work <Project>",
-    2: "https://example.invalid/admin/work-projects",
-  }));
-  assert.match(requests[0]?.authorization ?? "", /^Basic /);
+  assert.equal(requests[0]?.fields.get("to"), "+233241234567");
+  assert.match(requests[0]?.fields.get("text") ?? "", /Work <Project>/);
+  assert.equal(requests[1]?.fields.get("to"), "+233241234567");
+  assert.equal(requests[1]?.fields.get("channel"), "whatsapp");
+  assert.equal(requests[1]?.fields.get("message_type"), "template");
 
   nextAt.whatsapp = new Date(0);
   const retryCounts = await dispatchWorkAssignmentNotifications();
@@ -187,9 +198,9 @@ test("assignment dispatcher sends both channels and retries only a failed channe
   assert.equal(requests.length, 3);
 });
 
-test("Twilio rejects permanent errors without marking acceptance", async (t) => {
+test("Vonage rejects permanent SMS errors without marking acceptance", async (t) => {
   const oldFetch = globalThis.fetch;
-  const keys = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_SMS_FROM", "TWILIO_WHATSAPP_FROM", "TWILIO_WHATSAPP_CONTENT_SID", "NEXT_PUBLIC_SITE_URL"] as const;
+  const keys = ["VONAGE_API_KEY", "VONAGE_API_SECRET", "VONAGE_SMS_FROM", "VONAGE_APPLICATION_ID", "VONAGE_PRIVATE_KEY", "VONAGE_WHATSAPP_FROM", "NEXT_PUBLIC_SITE_URL"] as const;
   const oldEnv = keys.map((key) => process.env[key]);
   t.after(() => {
     globalThis.fetch = oldFetch;
@@ -198,14 +209,15 @@ test("Twilio rejects permanent errors without marking acceptance", async (t) => 
       else process.env[key] = oldEnv[index];
     });
   });
-  process.env.TWILIO_ACCOUNT_SID = `AC${"a".repeat(32)}`;
-  process.env.TWILIO_AUTH_TOKEN = "private-test-token";
-  process.env.TWILIO_SMS_FROM = "+14155552671";
-  process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+14155552671";
-  process.env.TWILIO_WHATSAPP_CONTENT_SID = `HX${"b".repeat(32)}`;
+  process.env.VONAGE_API_KEY = "abcdef";
+  process.env.VONAGE_API_SECRET = "private-test-token";
+  process.env.VONAGE_SMS_FROM = "WEBNEX";
+  process.env.VONAGE_APPLICATION_ID = "vonage-app-id";
+  process.env.VONAGE_PRIVATE_KEY = "unused-for-sms";
+  process.env.VONAGE_WHATSAPP_FROM = "+14155552671";
   process.env.NEXT_PUBLIC_SITE_URL = "https://example.invalid";
-  globalThis.fetch = async () => Response.json({ code: 20003 }, { status: 401 });
-  const sender = await createTwilioAssignmentSender();
+  globalThis.fetch = async () => Response.json({ messages: [{ status: "2", "error-text": "Account balance exhausted" }] }, { status: 200 });
+  const sender = await createVonageAssignmentSender();
   await assert.rejects(
     () => sender.sendSms("+14155552671", "Project"),
     (error: unknown) => error instanceof DeliveryError && !error.transient,
@@ -249,11 +261,12 @@ test("notification trigger accepts only the configured signed GitHub workflow", 
 
 test("disabled or unauthenticated notification triggers do not dispatch", async (t) => {
   const keys = [
-    "TWILIO_ACCOUNT_SID",
-    "TWILIO_AUTH_TOKEN",
-    "TWILIO_SMS_FROM",
-    "TWILIO_WHATSAPP_FROM",
-    "TWILIO_WHATSAPP_CONTENT_SID",
+    "VONAGE_API_KEY",
+    "VONAGE_API_SECRET",
+    "VONAGE_SMS_FROM",
+    "VONAGE_APPLICATION_ID",
+    "VONAGE_PRIVATE_KEY",
+    "VONAGE_WHATSAPP_FROM",
     "NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID",
     "NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF",
   ] as const;
@@ -264,11 +277,12 @@ test("disabled or unauthenticated notification triggers do not dispatch", async 
   }));
   keys.forEach((key) => delete process.env[key]);
   assert.equal((await dispatchPOST(new Request("https://example.com", { method: "POST" }))).status, 503);
-  process.env.TWILIO_ACCOUNT_SID = `AC${"a".repeat(32)}`;
-  process.env.TWILIO_AUTH_TOKEN = "test-token";
-  process.env.TWILIO_SMS_FROM = "+14155552671";
-  process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+14155552671";
-  process.env.TWILIO_WHATSAPP_CONTENT_SID = `HX${"b".repeat(32)}`;
+  process.env.VONAGE_API_KEY = "abcdef";
+  process.env.VONAGE_API_SECRET = "test-token";
+  process.env.VONAGE_SMS_FROM = "WEBNEX";
+  process.env.VONAGE_APPLICATION_ID = "vonage-app-id";
+  process.env.VONAGE_PRIVATE_KEY = "test-private-key";
+  process.env.VONAGE_WHATSAPP_FROM = "+14155552671";
   process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID = "123";
   process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF = "workflow";
   assert.equal((await dispatchPOST(new Request("https://example.com", { method: "POST" }))).status, 401);
@@ -277,22 +291,22 @@ test("disabled or unauthenticated notification triggers do not dispatch", async 
   }))).status, 401);
 });
 
-test("missing Twilio settings fail before reading the notification queue", async (t) => {
-  const old = process.env.TWILIO_ACCOUNT_SID;
+test("missing Vonage settings fail before reading the notification queue", async (t) => {
+  const old = process.env.VONAGE_API_KEY;
   const notifications = prisma.workAssignmentNotification;
   const originalFindMany = notifications.findMany;
   let queried = false;
   t.after(() => {
-    if (old === undefined) delete process.env.TWILIO_ACCOUNT_SID;
-    else process.env.TWILIO_ACCOUNT_SID = old;
+    if (old === undefined) delete process.env.VONAGE_API_KEY;
+    else process.env.VONAGE_API_KEY = old;
     Object.defineProperty(notifications, "findMany", { configurable: true, value: originalFindMany });
   });
-  delete process.env.TWILIO_ACCOUNT_SID;
+  delete process.env.VONAGE_API_KEY;
   Object.defineProperty(notifications, "findMany", {
     configurable: true,
     value: async () => { queried = true; return []; },
   });
-  await assert.rejects(() => dispatchWorkAssignmentNotifications(), /Twilio SMS and WhatsApp assignment alert settings/);
+  await assert.rejects(() => dispatchWorkAssignmentNotifications(), /Vonage SMS and WhatsApp assignment alert settings/);
   assert.equal(queried, false);
 });
 

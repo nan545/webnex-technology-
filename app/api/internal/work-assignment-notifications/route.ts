@@ -6,11 +6,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  if (!process.env.TWILIO_ACCOUNT_SID
-    || !process.env.TWILIO_AUTH_TOKEN
-    || !process.env.TWILIO_SMS_FROM
-    || !process.env.TWILIO_WHATSAPP_FROM
-    || !process.env.TWILIO_WHATSAPP_CONTENT_SID
+  if (!process.env.VONAGE_API_KEY
+    || !process.env.VONAGE_API_SECRET
+    || !process.env.VONAGE_SMS_FROM
+    || !process.env.VONAGE_APPLICATION_ID
+    || !process.env.VONAGE_PRIVATE_KEY
+    || !process.env.VONAGE_WHATSAPP_FROM
     || !process.env.NOTIFICATION_DISPATCH_GITHUB_REPOSITORY_ID
     || !process.env.NOTIFICATION_DISPATCH_GITHUB_WORKFLOW_REF) {
     return Response.json({ error: "Message dispatch is not configured." }, { status: 503 });

@@ -3,14 +3,14 @@ import { NotificationStatus } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
 import { DeliveryError } from "@/server/integrations/delivery-error";
 import {
-  createTwilioAssignmentSender,
+  createVonageAssignmentSender,
   normalizeAssignmentPhone,
-} from "@/server/integrations/twilio-assignment-alerts";
+} from "@/server/integrations/vonage-assignment-alerts";
 
 type Channel = "sms" | "whatsapp";
 
 export async function dispatchWorkAssignmentNotifications(batchSize = 10) {
-  const sender = await createTwilioAssignmentSender();
+  const sender = await createVonageAssignmentSender();
   const staleBefore = new Date(Date.now() - 2 * 60_000);
   await Promise.all([
     prisma.workAssignmentNotification.updateMany({
@@ -95,7 +95,7 @@ async function deliverChannel(input: {
   isActive: boolean;
   optedIn: boolean;
   title: string;
-  sender: Awaited<ReturnType<typeof createTwilioAssignmentSender>>;
+  sender: Awaited<ReturnType<typeof createVonageAssignmentSender>>;
 }): Promise<keyof Awaited<ReturnType<typeof dispatchWorkAssignmentNotifications>>> {
   const statusField = input.channel === "sms" ? "smsStatus" : "whatsappStatus";
   const nextAttemptField = input.channel === "sms" ? "smsNextAttemptAt" : "whatsappNextAttemptAt";
@@ -141,7 +141,7 @@ async function deliverChannel(input: {
   } catch (error) {
     const retry = error instanceof DeliveryError && error.transient && input.attemptCount < 5;
     const delay = Math.min(60 * 60_000, 30_000 * 2 ** (input.attemptCount - 1));
-    const detail = error instanceof DeliveryError ? error.message : "Unexpected Twilio delivery error.";
+    const detail = error instanceof DeliveryError ? error.message : "Unexpected Vonage delivery error.";
     console.error(`Assignment ${input.channel} delivery failed:`, detail);
     await prisma.workAssignmentNotification.updateMany({
       where: { id: input.id, [statusField]: NotificationStatus.PROCESSING },

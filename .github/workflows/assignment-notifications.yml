@@ -14,7 +14,6 @@ concurrency:
 
 jobs:
   dispatch:
-    if: vars.ENABLE_WORK_ASSIGNMENT_NOTIFICATIONS == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

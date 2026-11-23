@@ -25,7 +25,7 @@ export async function listServices(page: number, pageSize: number, skip: number,
     ...publishedAtFilter(),
     ...searchFilter(query, ["title", "summary"]),
   };
-  const [items, total] = await prisma.$transaction([
+  const [items, total] = await Promise.all([
     prisma.service.findMany({
       where,
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
@@ -74,7 +74,7 @@ export async function listProjects(page: number, pageSize: number, skip: number,
       },
     ],
   };
-  const [items, total] = await prisma.$transaction([
+  const [items, total] = await Promise.all([
     prisma.project.findMany({
       where,
       orderBy: [{ publishedAt: "desc" }, { title: "asc" }],
@@ -148,7 +148,7 @@ export async function listCaseStudies(page: number, pageSize: number, skip: numb
       },
     ],
   };
-  const [items, total] = await prisma.$transaction([
+  const [items, total] = await Promise.all([
     prisma.caseStudy.findMany({
       where,
       orderBy: [{ publishedAt: "desc" }, { title: "asc" }],
@@ -204,7 +204,7 @@ export async function listIndustries(page: number, pageSize: number, skip: numbe
     ...publishedAtFilter(),
     ...searchFilter(query, ["title", "summary"]),
   };
-  const [items, total] = await prisma.$transaction([
+  const [items, total] = await Promise.all([
     prisma.industry.findMany({
       where,
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
@@ -252,7 +252,7 @@ export async function listBlogPosts(
     ...searchFilter(query, ["title", "excerpt"]),
     ...(categorySlug ? { categories: { some: { category: { slug: categorySlug } } } } : {}),
   };
-  const [items, total] = await prisma.$transaction([
+  const [items, total] = await Promise.all([
     prisma.blogPost.findMany({
       where,
       orderBy: [{ publishedAt: "desc" }, { title: "asc" }],
@@ -298,7 +298,7 @@ export async function listBlogCategories(page: number, pageSize: number, skip: n
   const where: Prisma.CategoryWhereInput = {
     posts: { some: { blogPost: publishedAtFilter() } },
   };
-  const [items, total] = await prisma.$transaction([
+  const [items, total] = await Promise.all([
     prisma.category.findMany({
       where,
       orderBy: { name: "asc" },
@@ -340,7 +340,7 @@ export function getPublicSiteSettings() {
 
 export async function listTestimonials(page: number, pageSize: number, skip: number) {
   const where: Prisma.TestimonialWhereInput = publishedAtFilter();
-  const [items, total] = await prisma.$transaction([
+  const [items, total] = await Promise.all([
     prisma.testimonial.findMany({
       where,
       orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],

@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { customRoleSchema, type CustomRoleInput } from "@/lib/validation/roles";
 import { apiError, handleApiFailure } from "@/server/api/response";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 
 export class RoleManagementError extends Error {
   constructor(public readonly code: "INVALID_ROLE" | "ROLE_NOT_FOUND" | "ROLE_NAME_EXISTS" | "PROTECTED_ROLE") {
@@ -28,7 +28,7 @@ export async function saveCustomRole(
   const parsed = customRoleSchema.safeParse(input);
   if (!parsed.success) throw new RoleManagementError("INVALID_ROLE");
 
-  return prisma.$transaction(async (transaction) => {
+  return runInTransaction(async (transaction) => {
     await transaction.$executeRaw`SELECT pg_advisory_xact_lock(72340172838076673)`;
     const existing = roleId ? await transaction.role.findUnique({
       where: { id: roleId },

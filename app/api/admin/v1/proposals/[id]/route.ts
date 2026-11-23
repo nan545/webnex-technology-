@@ -2,7 +2,7 @@ import { EnquiryStatus, ProposalStatus } from "@/generated/prisma/client";
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 import { isProposalExpired } from "@/lib/validation/proposal";
 
@@ -36,7 +36,7 @@ export async function PATCH(
   if (!input.success) return apiError(422, "VALIDATION_FAILED", "Proposal status is invalid.");
 
   try {
-    const updated = await prisma.$transaction(async (transaction) => {
+    const updated = await runInTransaction(async (transaction) => {
       const proposal = await transaction.proposal.findUnique({
         where: { id },
         select: { id: true, title: true, status: true, enquiryId: true, expiryDate: true },

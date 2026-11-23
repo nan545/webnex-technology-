@@ -29,7 +29,7 @@ export default async function AdminUsersPage({
         ],
       }
     : {};
-  const [users, totalItems, roles] = await prisma.$transaction([
+  const [users, totalItems, roles] = await Promise.all([
     prisma.user.findMany({
       where,
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],

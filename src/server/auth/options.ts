@@ -1,8 +1,12 @@
-import type { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions, User } from "next-auth";
+import type { AdapterUser } from "next-auth/adapters";
+import type { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { z } from "zod";
-import { prisma } from "@/server/db";
+import { adminIdleDeadline, ADMIN_IDLE_TIMEOUT_MS } from "@/lib/admin-session";
+import { prisma, runInTransaction } from "@/server/db";
+import { runAsDatabaseActor } from "@/server/db-context";
 import { consumeLoginRateLimit } from "@/server/security/auth-rate-limit";
 
 const credentialsSchema = z.object({
@@ -31,7 +35,32 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email address", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(rawCredentials, request) {
+      authorize: (rawCredentials, request) =>
+        runAsDatabaseActor({ kind: "auth" }, () => authorizeCredentials(rawCredentials, request)),
+    }),
+  ],
+  callbacks: {
+    jwt: ({ token, user, trigger }) =>
+      runAsDatabaseActor({ kind: "auth" }, () => refreshToken(token, user, trigger)),
+    async session({ session, token }) {
+      if (session.user && token.sub && typeof token.lastActivity === "number") {
+        session.user.id = token.sub;
+        session.idleExpires = token.lastActivity + ADMIN_IDLE_TIMEOUT_MS;
+      }
+      return session;
+    },
+  },
+  events: {
+    signOut: ({ token }) =>
+      runAsDatabaseActor({ kind: "auth" }, () => recordSignOut(token)),
+  },
+  useSecureCookies: process.env.NODE_ENV === "production",
+};
+
+async function authorizeCredentials(
+  rawCredentials: Record<string, string> | undefined,
+  request: { headers?: Record<string, string | string[] | undefined> },
+) {
         const parsed = credentialsSchema.safeParse(rawCredentials);
         if (!parsed.success) return null;
 
@@ -67,7 +96,7 @@ export const authOptions: NextAuthOptions = {
 
         if (!user || !accountAvailable || !passwordMatches) {
           if (user) {
-            await prisma.$transaction(async (transaction) => {
+            await runInTransaction(async (transaction) => {
               if (user.isActive && (!user.lockedUntil || user.lockedUntil <= now)) {
                 if (user.lockedUntil && user.lockedUntil <= now) {
                   await transaction.user.update({
@@ -139,52 +168,47 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           sessionVersion: updated.sessionVersion,
         };
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.sessionVersion = user.sessionVersion;
-      }
+}
 
-      if (!token.sub || typeof token.sessionVersion !== "number") {
-        return {};
-      }
+async function refreshToken(token: JWT, user: User | AdapterUser | undefined, trigger: "signIn" | "signUp" | "update" | undefined) {
+  const now = Date.now();
+  if (user) {
+    token.sessionVersion = user.sessionVersion;
+    token.lastActivity = now;
+  }
 
-      const currentUser = await prisma.user.findUnique({
-        where: { id: token.sub },
-        select: { isActive: true, sessionVersion: true },
-      });
+  if (
+    !token.sub ||
+    typeof token.sessionVersion !== "number" ||
+    adminIdleDeadline(token.lastActivity, now) === null
+  ) {
+    return {};
+  }
 
-      if (
-        !currentUser?.isActive ||
-        currentUser.sessionVersion !== token.sessionVersion
-      ) {
-        return {};
-      }
+  const currentUser = await prisma.user.findUnique({
+    where: { id: token.sub },
+    select: { isActive: true, sessionVersion: true },
+  });
 
-      return token;
+  if (
+    !currentUser?.isActive ||
+    currentUser.sessionVersion !== token.sessionVersion
+  ) {
+    return {};
+  }
+
+  if (trigger === "update") token.lastActivity = now;
+  return token;
+}
+
+async function recordSignOut(token: JWT | undefined) {
+  if (!token?.sub) return;
+  await prisma.auditLog.create({
+    data: {
+      actorId: token.sub,
+      action: "AUTH_LOGOUT",
+      entityType: "User",
+      entityId: token.sub,
     },
-    async session({ session, token }) {
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
-      }
-      return session;
-    },
-  },
-  events: {
-    async signOut({ token }) {
-      if (!token?.sub) return;
-      await prisma.auditLog.create({
-        data: {
-          actorId: token.sub,
-          action: "AUTH_LOGOUT",
-          entityType: "User",
-          entityId: token.sub,
-        },
-      });
-    },
-  },
-  useSecureCookies: process.env.NODE_ENV === "production",
-};
+  });
+}

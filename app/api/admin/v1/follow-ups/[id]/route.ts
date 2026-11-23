@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const uuidSchema = z.string().uuid();
@@ -34,7 +34,7 @@ export async function PATCH(
   }
 
   try {
-    const result = await prisma.$transaction(async (transaction) => {
+    const result = await runInTransaction(async (transaction) => {
       const task = await transaction.followUpTask.findUnique({
         where: { id },
         select: { id: true, title: true, enquiryId: true, completedAt: true },

@@ -3,7 +3,7 @@ import { teamMemberUpdateSchema } from "@/lib/validation/team-member";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
 import { removeUnreferencedTeamPhoto } from "@/server/content/team-photo-cleanup";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 import { z } from "zod";
 
@@ -40,7 +40,7 @@ export async function PATCH(
   }
 
   try {
-    const updated = await prisma.$transaction(async (transaction) => {
+    const updated = await runInTransaction(async (transaction) => {
       const current = await transaction.teamMember.findUnique({
         where: { id },
         select: {
@@ -151,7 +151,7 @@ export async function DELETE(
   if (!uuidSchema.safeParse(id).success) return apiError(404, "NOT_FOUND", "Team member was not found.");
 
   try {
-    const member = await prisma.$transaction(async (transaction) => {
+    const member = await runInTransaction(async (transaction) => {
       const current = await transaction.teamMember.findUnique({
         where: { id },
         select: { id: true, name: true, status: true, profileImageId: true },

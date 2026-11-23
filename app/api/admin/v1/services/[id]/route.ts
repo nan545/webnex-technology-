@@ -3,7 +3,7 @@ import { z } from "zod";
 import { cmsServiceUpdateSchema } from "@/lib/validation/cms-service";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const uuidSchema = z.string().uuid();
@@ -62,7 +62,7 @@ export async function PATCH(
   }
 
   try {
-    const updated = await prisma.$transaction(async (transaction) => {
+    const updated = await runInTransaction(async (transaction) => {
       const current = await transaction.service.findUnique({ where: { id } });
       if (!current) return null;
 
@@ -207,7 +207,7 @@ export async function DELETE(
   if (!uuidSchema.safeParse(id).success) return apiError(404, "NOT_FOUND", "Service was not found.");
 
   try {
-    const result = await prisma.$transaction(async (transaction) => {
+    const result = await runInTransaction(async (transaction) => {
       const service = await transaction.service.findUnique({ where: { id }, select: { id: true, status: true } });
       if (!service) return false;
       const linkedProjects = await transaction.projectService.count({ where: { serviceId: id } });

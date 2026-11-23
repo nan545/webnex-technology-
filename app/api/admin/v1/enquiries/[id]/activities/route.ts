@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 
@@ -32,7 +32,7 @@ export async function POST(
   if (!input.success) return apiError(422, "VALIDATION_FAILED", "The activity details are invalid.");
 
   try {
-    const activity = await prisma.$transaction(async (transaction) => {
+    const activity = await runInTransaction(async (transaction) => {
       const enquiry = await transaction.enquiry.findUnique({
         where: { id },
         select: { id: true, phone: true, whatsappConsentAt: true },

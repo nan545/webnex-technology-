@@ -2,7 +2,7 @@ import { ContentStatus, Prisma } from "@/generated/prisma/client";
 import { cmsServiceCreateSchema } from "@/lib/validation/cms-service";
 import { apiError, apiSuccess, handleApiFailure, parsePagination } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 export async function GET(request: Request) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     : {};
 
   try {
-    const [items, totalItems] = await prisma.$transaction([
+    const [items, totalItems] = await Promise.all([
       prisma.service.findMany({
         where,
         orderBy: [{ updatedAt: "desc" }, { title: "asc" }],
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
   if (!input.success) return apiError(422, "VALIDATION_FAILED", "Review the service details.");
 
   try {
-    const service = await prisma.$transaction(async (transaction) => {
+    const service = await runInTransaction(async (transaction) => {
       const redirectCollision = await transaction.serviceRedirect.findUnique({
         where: { sourceSlug: input.data.slug },
         select: { id: true },

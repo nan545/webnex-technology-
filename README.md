@@ -48,6 +48,16 @@ Generate separate random secrets and put them in `.env` as `RATE_LIMIT_SECRET` a
 
 ## Database setup
 
+**Row-level security is a work in progress, not deployed or ready for use.**
+`prisma/rls-draft.sql` is deliberately outside the migrations directory; do not
+apply it to a shared or production database. The accompanying application
+changes are incomplete and must not be deployed. In an isolated test, the
+draft blocked authentication audit inserts, and the request actor isolation,
+permission matrix, and end-to-end workflows still need verification.
+PostgreSQL superusers and roles with `BYPASSRLS` bypass these policies;
+table owners can also alter them. Transaction-local application settings are
+not a defense against arbitrary SQL executed with the application credentials.
+
 After PostgreSQL is available and `DATABASE_URL` is configured:
 
 ```powershell
@@ -101,6 +111,14 @@ After applying migrations and seeding roles:
 
 Auth.js Credentials uses bcrypt password hashes, eight-hour signed sessions, active-account/session-version checks on server session reads, login rate limiting, temporary lockout after five invalid attempts, generic login errors, and login audit records. Admin endpoints re-check permissions from the database for each operation. Admin state-changing endpoints require a same-origin `Origin` header. The first Super Admin is created by the CLI and cannot be self-provisioned through the web UI.
 
+Administrators are signed out after 15 minutes without interaction. Activity
+updates are sent at most once every five seconds; the server rejects an expired
+session even if the browser is closed or JavaScript is disabled. Sessions
+created before this timeout was introduced require signing in again.
+The signed JWT remains stateless: signing out clears the browser cookie but
+does not revoke a copied token; administrator deactivation or a session-version
+change invalidates existing tokens on their next server check.
+
 | Role | Access |
 | --- | --- |
 | `SUPER_ADMIN` | All seeded permissions, including users, role assignment, audit log and settings. |
@@ -129,6 +147,12 @@ Not implemented: CMS editors for homepage/about sections, case studies, industri
 ### Projects and insights
 
 Administrators with `projects:manage` or `blog:manage` can create and edit drafts under **Projects** or **Insights**. Publication, unpublishing, and changes to published content or its cover require `content:publish`. Save a record first, then optionally upload a JPG, PNG, or WebP cover and a description. Images use the private object-storage configuration described below; uploads are limited to 5 MB and converted to WebP. Published content appears on its public listing, detail page and sitemap; published projects can also appear on the homepage. Previously published URL slugs cannot be changed. The editor supports paragraphs separated by blank lines, not rich text, scheduling, deletion, or revisions.
+
+### Private work projects
+
+The **Work projects** admin page is separate from the public portfolio. Administrators with `projects:manage` can create and edit work projects, set their status, and assign multiple active login accounts with `dashboard:read`. Other signed-in users see only work projects assigned to their own account, with read-only project details. Assigned accounts can accept or decline the assignment. Team profiles are not login accounts: create a separate admin account and assign a suitable role before assigning work. Assignment does not grant other permissions. Removing an assignment revokes access on subsequent reads; there is no project deletion or task management workflow.
+
+Each new assignment queues an email containing the project title and a sign-in link to the account email address. Configure `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `NOTIFICATION_TO_EMAIL`, and HTTPS `NEXT_PUBLIC_SITE_URL`, then schedule `npm run email:dispatch`; the application does not run the dispatcher itself. The manager view shows queue and assignment acknowledgement status; **accepted by provider** does not mean delivered. Failed emails are not automatically retried after five attempts or permanent errors. Unassigning and reassigning creates a new notification and resets acknowledgement; an email already being sent may still arrive after removal. A provider acceptance followed by a worker crash can cause a duplicate. Apply the `20261118230000_private_work_projects` and `20261123003000_work_project_assignment_consent` migrations with `npm run db:deploy` after backing up and reviewing the target database. The separate isolated database test can be enabled with `RUN_WORK_PROJECT_DB_TESTS=1` only against `127.0.0.1:55435/webnex_work_project_test`.
 
 Apply the `20261115140000_publication_cover_images` migration before deploying code that reads the new image relationships. Review and back up the target database first. Existing records with unsupported content formats or workflow statuses are listed in the admin interface for manual review and are not editable there. Published records with unsupported content are omitted from the new public pages and logged; their data is not changed. Review these records before deployment. Draft cover images are not publicly accessible.
 
@@ -279,7 +303,7 @@ git push -u origin main
 - Public API routes are implemented, but public page rendering/navigation/search is not yet wired to these records.
 - Administrator login/logout, credentials hashing, active-account and session-version checks, seeded RBAC, protected admin routes, and first-admin bootstrap are implemented in code, but cannot be verified against PostgreSQL without valid credentials. MFA and password reset are not implemented.
 - An outbox row is created with each enquiry; email delivery and outbox retry processing are not implemented pending provider approval. The API success response means the enquiry is stored and notification is queued, not emailed.
-- A general media library is not implemented. Team profile and publication image uploads are supported when private persistent storage is configured; media metadata is stored in PostgreSQL.
+- The general media library is implemented for private image upload, search, metadata editing, previews and deletion of unreferenced assets. Team profile and publication image uploads use the same private object-storage configuration.
 - A shared-proxy deployment needs a trusted `x-real-ip` header for per-client rate limits; verify Render's proxy behavior before launch.
 - Database backups/restore, production credentials, and deployment have not been configured or verified.
 - Projects, case studies, articles, testimonials, contact details, and legal policies are not fabricated. Their pages show an honest empty or approval-required state until verified content is supplied.

@@ -2,7 +2,7 @@ import { NotificationStatus } from "@/generated/prisma/client";
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 export async function POST(
@@ -17,7 +17,7 @@ export async function POST(
   if (!z.string().uuid().safeParse(id).success) return apiError(404, "NOT_FOUND", "Email notification was not found.");
 
   try {
-    const updated = await prisma.$transaction(async (transaction) => {
+    const updated = await runInTransaction(async (transaction) => {
       const result = await transaction.notificationOutbox.updateMany({
         where: { id, status: NotificationStatus.FAILED },
         data: {

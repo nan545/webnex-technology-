@@ -35,7 +35,7 @@ export default async function AdminTeamPage({
       : {}),
     ...(status ? { status } : {}),
   };
-  const [records, totalItems] = await prisma.$transaction([
+  const [records, totalItems] = await Promise.all([
     prisma.teamMember.findMany({
       where,
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],

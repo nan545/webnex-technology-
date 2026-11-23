@@ -2,6 +2,7 @@ import "server-only";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/server/auth/options";
 import { prisma } from "@/server/db";
+import { openRequestActorScope, runAsDatabaseActor } from "@/server/db-context";
 
 export type AdminContext = {
   id: string;
@@ -11,7 +12,17 @@ export type AdminContext = {
   permissions: Set<string>;
 };
 
+// Verifying the session is the only place an administrator identity is
+// established, so it also binds that identity to the request's database
+// queries. The scope must be opened before the first await.
 export async function getAdminContext(): Promise<AdminContext | null> {
+  const scope = openRequestActorScope();
+  const admin = await runAsDatabaseActor({ kind: "auth" }, loadAdminContext);
+  if (admin) scope.promoteToAdmin(admin.id, admin.permissions);
+  return admin;
+}
+
+async function loadAdminContext(): Promise<AdminContext | null> {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id;
   if (!userId) return null;

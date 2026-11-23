@@ -3,7 +3,7 @@ import { readBoundedJson } from "@/server/api/bounded-json";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
 import { navigationSettingKey } from "@/server/content/site-configuration";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 export async function PUT(request: Request) {
@@ -18,7 +18,7 @@ export async function PUT(request: Request) {
   if (!parsed.success) return apiError(422, "VALIDATION_FAILED", "Review the navigation links and use unique, valid internal paths.");
 
   try {
-    await prisma.$transaction(async (transaction) => {
+    await runInTransaction(async (transaction) => {
       await transaction.siteSetting.upsert({
         where: { key: navigationSettingKey },
         create: { key: navigationSettingKey, value: parsed.data, isPublic: true, updatedById: authorization.admin!.id },

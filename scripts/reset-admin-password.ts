@@ -2,6 +2,7 @@ import "dotenv/config";
 import { env } from "../src/server/env";
 import { resetAdminPassword } from "../src/server/auth/admin-password-reset";
 import { prisma } from "../src/server/db";
+import { runAsDatabaseActor } from "../src/server/db-context";
 import { prompt, promptPassword } from "./interactive-input";
 
 async function main() {
@@ -16,7 +17,7 @@ async function main() {
   const approval = await prompt("Confirm this database and account; type RESET to continue: ");
   if (approval !== "RESET") throw new Error("Password reset cancelled.");
 
-  await resetAdminPassword({ email, password });
+  await runAsDatabaseActor({ kind: "system" }, () => resetAdminPassword({ email, password }));
   console.log("Administrator password reset. Existing sessions have been invalidated.");
 }
 

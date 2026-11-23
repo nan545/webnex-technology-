@@ -62,7 +62,7 @@ export async function GET(request: Request) {
   };
 
   try {
-    const [items, totalItems] = await prisma.$transaction([
+    const [items, totalItems] = await Promise.all([
       prisma.enquiry.findMany({
         where,
         orderBy: { createdAt: "desc" },

@@ -7,9 +7,14 @@ import { authOptions } from "@/server/auth/options";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Administrator sign in" };
 
-export default async function AdminLoginPage() {
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reason?: string }>;
+}) {
   const session = await getServerSession(authOptions);
   if (session?.user?.id) redirect("/admin");
+  const { reason } = await searchParams;
 
   return (
     <main className="grid min-h-screen place-items-center bg-slate-50 px-5 py-12">
@@ -23,6 +28,11 @@ export default async function AdminLoginPage() {
         <p className="mt-2 text-sm leading-6 text-muted">
           This area is restricted to authorized WEBNEX personnel.
         </p>
+        {reason === "idle" ? (
+          <p className="mt-4 text-sm text-navy-800" role="status">
+            Your session ended after inactivity. Please sign in again.
+          </p>
+        ) : null}
         <AdminLoginForm />
       </section>
     </main>

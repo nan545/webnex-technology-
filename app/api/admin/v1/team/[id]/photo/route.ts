@@ -3,7 +3,7 @@ import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
 import { removeUnreferencedTeamPhoto } from "@/server/content/team-photo-cleanup";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import {
   getObjectStorageConfiguration,
   putPrivateObject,
@@ -101,7 +101,7 @@ export async function POST(
 
   let createdMediaId: string | null = null;
   try {
-    const result = await prisma.$transaction(async (transaction) => {
+    const result = await runInTransaction(async (transaction) => {
       const current = await transaction.teamMember.findUnique({
         where: { id: memberId },
         select: { profileImageId: true, status: true },
@@ -179,7 +179,7 @@ export async function DELETE(
   if (!uuidSchema.safeParse(id).success) return apiError(404, "NOT_FOUND", "Team member was not found.");
 
   try {
-    const removed = await prisma.$transaction(async (transaction) => {
+    const removed = await runInTransaction(async (transaction) => {
       const member = await transaction.teamMember.findUnique({
         where: { id },
         select: { profileImageId: true, status: true },

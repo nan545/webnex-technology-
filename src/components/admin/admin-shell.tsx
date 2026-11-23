@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { AdminContext } from "@/server/auth/authorization";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
+import { IdleSession } from "@/components/admin/idle-session";
 import { DatabaseStatus } from "@/components/admin/database-status";
 import { BrandLogo } from "@/components/layout/brand-logo";
 
@@ -12,9 +13,11 @@ const activeNavigation = [
   { href: "/admin/proposals", label: "Proposals", permission: "proposals:manage" },
   { href: "/admin/integrations", label: "Integrations", permission: "settings:manage" },
   { href: "/admin/services", label: "Services", permission: "content:read" },
+  { href: "/admin/work-projects", label: "Work projects", permission: "dashboard:read" },
   { href: "/admin/publications/projects", label: "Projects", permission: "projects:manage" },
   { href: "/admin/publications/insights", label: "Insights", permission: "blog:manage" },
   { href: "/admin/team", label: "Team Members", permission: "team:view" },
+  { href: "/admin/media", label: "Media library", permission: "media:manage" },
   { href: "/admin/enquiries", label: "Enquiries", permission: "enquiries:read" },
   { href: "/admin/users", label: "Users and roles", permission: "users:manage" },
   { href: "/admin/audit-logs", label: "Audit logs", permission: "audit:read" },
@@ -25,7 +28,6 @@ const activeNavigation = [
 const navigationGroups = [
   { permission: "projects:manage", labels: ["Case studies", "Industries"] },
   { permission: "testimonials:manage", labels: ["Testimonials"] },
-  { permission: "media:manage", labels: ["Media library"] },
 ] as const;
 
 export function AdminShell({
@@ -81,6 +83,7 @@ export function AdminShell({
         </nav>
       </aside>
       <div className="min-w-0">
+        <IdleSession />
         <header className="flex min-h-[72px] items-center justify-between border-b border-border bg-white px-5 sm:px-8">
           <div>
             <p className="text-xs text-muted">Administration / Workspace</p>

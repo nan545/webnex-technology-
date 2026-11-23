@@ -24,7 +24,7 @@ export default async function FollowUpsPage({
     : state === "overdue"
       ? { completedAt: null, dueAt: { lt: now } }
       : { completedAt: null };
-  const [records, totalItems] = await prisma.$transaction([
+  const [records, totalItems] = await Promise.all([
     prisma.followUpTask.findMany({
       where,
       orderBy: [{ completedAt: "asc" }, { dueAt: "asc" }],

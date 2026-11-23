@@ -5,7 +5,7 @@ import { publicationKindSchema } from "@/lib/validation/publication";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
 import { publicationPermission } from "@/server/content/publications";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { getObjectStorageConfiguration, putPrivateObject, removePrivateObject } from "@/server/integrations/object-storage";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
@@ -74,7 +74,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
   }
   let committed = false;
   try {
-    const result = await prisma.$transaction(async (transaction) => {
+    const result = await runInTransaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(72340172838076674)`;
       const current = kind === "projects"
         ? await transaction.project.findUnique({ where: { id }, select: { status: true, coverImageId: true } })

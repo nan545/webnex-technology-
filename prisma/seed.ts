@@ -1,4 +1,4 @@
-import { PrismaClient } from "../src/generated/prisma/client";
+import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { env } from "../src/server/env";
 
@@ -79,6 +79,14 @@ const rolePermissions: Record<string, readonly string[]> = {
 };
 
 async function main() {
+  await prisma.$transaction(async (transaction) => {
+    await transaction.$executeRaw`SELECT set_config('app.actor', 'system', true)`;
+    await seedRoles(transaction);
+  }, { timeout: 30_000 });
+  console.log("Development roles and permissions are ready.");
+}
+
+async function seedRoles(prisma: Prisma.TransactionClient) {
   const roleDefinitions = [
     ["SUPER_ADMIN", "Super Admin"],
     ["ADMIN", "Administrator"],
@@ -132,7 +140,6 @@ async function main() {
     }
   }
 
-  console.log("Development roles and permissions are ready.");
 }
 
 main()

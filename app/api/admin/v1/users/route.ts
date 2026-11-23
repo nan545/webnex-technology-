@@ -45,6 +45,8 @@ export async function GET(request: Request) {
           phone: true,
           smsAlertsEnabled: true,
           whatsappAlertsEnabled: true,
+          smsConsentAt: true,
+          whatsappConsentAt: true,
           isActive: true,
           lastLoginAt: true,
           createdAt: true,
@@ -93,6 +95,7 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hash(input.data.password, 12);
+    const consentRecordedAt = new Date();
     const user = await runInTransaction(async (transaction) => {
       const created = await transaction.user.create({
         data: {
@@ -101,6 +104,8 @@ export async function POST(request: Request) {
           phone: input.data.phone ?? null,
           smsAlertsEnabled: input.data.smsAlertsEnabled,
           whatsappAlertsEnabled: input.data.whatsappAlertsEnabled,
+          smsConsentAt: input.data.smsAlertsEnabled ? consentRecordedAt : null,
+          whatsappConsentAt: input.data.whatsappAlertsEnabled ? consentRecordedAt : null,
           passwordHash,
           roles: { create: { roleId: role.id } },
         },
@@ -118,7 +123,13 @@ export async function POST(request: Request) {
           action: "USER_CREATED",
           entityType: "User",
           entityId: created.id,
-          details: { role: role.key },
+          details: {
+            role: role.key,
+            smsAlertsEnabled: input.data.smsAlertsEnabled,
+            whatsappAlertsEnabled: input.data.whatsappAlertsEnabled,
+            smsConsentAt: input.data.smsAlertsEnabled ? consentRecordedAt.toISOString() : null,
+            whatsappConsentAt: input.data.whatsappAlertsEnabled ? consentRecordedAt.toISOString() : null,
+          },
         },
       });
       return created;

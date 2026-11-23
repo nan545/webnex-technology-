@@ -60,6 +60,8 @@ export async function PATCH(
             phone: true,
             smsAlertsEnabled: true,
             whatsappAlertsEnabled: true,
+            smsConsentAt: true,
+            whatsappConsentAt: true,
             isActive: true,
             roles: { select: { role: { select: { id: true, key: true } } } },
           },
@@ -69,6 +71,12 @@ export async function PATCH(
         const phone = input.data.phone !== undefined ? input.data.phone : existing.phone;
         const smsAlertsEnabled = input.data.smsAlertsEnabled ?? existing.smsAlertsEnabled;
         const whatsappAlertsEnabled = input.data.whatsappAlertsEnabled ?? existing.whatsappAlertsEnabled;
+        const smsConsentAt = input.data.smsAlertsEnabled
+          ? (input.data.smsAlertsEnabled ? (existing.smsConsentAt ?? new Date()) : null)
+          : existing.smsConsentAt;
+        const whatsappConsentAt = input.data.whatsappAlertsEnabled
+          ? (input.data.whatsappAlertsEnabled ? (existing.whatsappConsentAt ?? new Date()) : null)
+          : existing.whatsappConsentAt;
         if ((smsAlertsEnabled || whatsappAlertsEnabled) && !phone) return { invalidContact: true } as const;
 
         const currentRole = existing.roles[0]?.role;
@@ -107,6 +115,12 @@ export async function PATCH(
             ...(input.data.phone !== undefined ? { phone: input.data.phone } : {}),
             ...(input.data.smsAlertsEnabled !== undefined ? { smsAlertsEnabled: input.data.smsAlertsEnabled } : {}),
             ...(input.data.whatsappAlertsEnabled !== undefined ? { whatsappAlertsEnabled: input.data.whatsappAlertsEnabled } : {}),
+            ...(input.data.smsAlertsEnabled !== undefined
+              ? { smsConsentAt: smsConsentAt }
+              : {}),
+            ...(input.data.whatsappAlertsEnabled !== undefined
+              ? { whatsappConsentAt: whatsappConsentAt }
+              : {}),
             ...(input.data.isActive !== undefined ? { isActive: input.data.isActive } : {}),
             ...(input.data.isActive !== undefined && input.data.isActive !== existing.isActive ||
             roleChanged
@@ -181,6 +195,12 @@ export async function PATCH(
               ...(input.data.phone !== undefined ? { phoneChanged: true } : {}),
               ...(input.data.smsAlertsEnabled !== undefined ? { smsAlertsEnabled } : {}),
               ...(input.data.whatsappAlertsEnabled !== undefined ? { whatsappAlertsEnabled } : {}),
+              ...(input.data.smsAlertsEnabled !== undefined
+                ? { smsConsentAt: smsConsentAt?.toISOString() ?? null }
+                : {}),
+              ...(input.data.whatsappAlertsEnabled !== undefined
+                ? { whatsappConsentAt: whatsappConsentAt?.toISOString() ?? null }
+                : {}),
               ...(input.data.isActive !== undefined ? { isActive: input.data.isActive } : {}),
               ...(roleChanged ? { previousRole: currentRole?.key ?? null, role: role!.key } : {}),
             },

@@ -86,6 +86,8 @@ model User {
   phone                 String?   @db.VarChar(40)
   smsAlertsEnabled      Boolean   @default(false)
   whatsappAlertsEnabled Boolean   @default(false)
+  smsConsentAt          DateTime?
+  whatsappConsentAt     DateTime?
   emailVerified       DateTime?
   image               String?
   passwordHash        String?

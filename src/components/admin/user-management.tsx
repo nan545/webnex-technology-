@@ -11,6 +11,8 @@ type AdminUserRow = {
   phone: string | null;
   smsAlertsEnabled: boolean;
   whatsappAlertsEnabled: boolean;
+  smsConsentAt: string | null;
+  whatsappConsentAt: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -256,6 +258,12 @@ export function UserManagement({
                       <p>SMS: {user.smsAlertsEnabled ? "on" : "off"}</p>
                       <p>WhatsApp: {user.whatsappAlertsEnabled ? "on" : "off"}</p>
                       <p className="mt-1 text-xs text-muted">{user.phone || "No phone number"}</p>
+                      {user.smsAlertsEnabled && user.smsConsentAt ? (
+                        <p className="mt-1 text-xs text-muted">SMS consent: {new Date(user.smsConsentAt).toLocaleString("en-GH")}</p>
+                      ) : null}
+                      {user.whatsappAlertsEnabled && user.whatsappConsentAt ? (
+                        <p className="mt-1 text-xs text-muted">WhatsApp consent: {new Date(user.whatsappConsentAt).toLocaleString("en-GH")}</p>
+                      ) : null}
                       <button
                         className="mt-2 min-h-9 border border-border px-3 text-xs font-medium hover:border-blue-700 hover:text-blue-700"
                         disabled={saving}

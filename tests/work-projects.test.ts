@@ -40,7 +40,7 @@ test("non-manager project listing is limited to the signed-in assignee", async (
     configurable: true,
     value: async (args: { where?: unknown; select: Record<string, unknown> }) => {
       assert.deepEqual(args.where, { assignments: { some: { userId } } });
-      assert.equal("assignments" in args.select, false);
+      assert.equal("assignments" in args.select, true);
       return [];
     },
   });

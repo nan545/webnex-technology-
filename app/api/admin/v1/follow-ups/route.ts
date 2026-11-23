@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure, parsePagination } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const createTaskSchema = z.object({
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       : { completedAt: null };
 
   try {
-    const [items, totalItems] = await prisma.$transaction([
+    const [items, totalItems] = await Promise.all([
       prisma.followUpTask.findMany({
         where,
         orderBy: [{ completedAt: "asc" }, { dueAt: "asc" }],
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const task = await prisma.$transaction(async (transaction) => {
+    const task = await runInTransaction(async (transaction) => {
       const enquiry = await transaction.enquiry.findUnique({
         where: { id: input.data.enquiryId },
         select: { id: true, reference: true },

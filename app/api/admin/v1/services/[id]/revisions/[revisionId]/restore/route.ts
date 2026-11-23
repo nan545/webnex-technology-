@@ -2,7 +2,7 @@ import { ContentStatus, Prisma } from "@/generated/prisma/client";
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const uuidSchema = z.string().uuid();
@@ -21,7 +21,7 @@ export async function POST(
   }
 
   try {
-    const restored = await prisma.$transaction(async (transaction) => {
+    const restored = await runInTransaction(async (transaction) => {
       const [service, revision] = await Promise.all([
         transaction.service.findUnique({ where: { id } }),
         transaction.serviceRevision.findFirst({ where: { id: revisionId, serviceId: id } }),

@@ -5,7 +5,7 @@ import { roleKeySchema } from "@/lib/validation/roles";
 import { readBoundedJson } from "@/server/api/bounded-json";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeSuperAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const updateSchema = z
@@ -48,7 +48,7 @@ export async function PATCH(
   }
 
   try {
-    const user = await prisma.$transaction(
+    const user = await runInTransaction(
       async (transaction) => {
         await transaction.$executeRaw`SELECT pg_advisory_xact_lock(72340172838076673)`;
         const existing = await transaction.user.findUnique({

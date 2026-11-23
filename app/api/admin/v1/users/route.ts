@@ -5,7 +5,7 @@ import { roleKeySchema } from "@/lib/validation/roles";
 import { readBoundedJson } from "@/server/api/bounded-json";
 import { apiError, apiSuccess, handleApiFailure, parsePagination } from "@/server/api/response";
 import { authorizeSuperAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const createUserSchema = z.object({
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   if (!pagination) return apiError(400, "INVALID_PAGINATION", "Pagination parameters are invalid.");
 
   try {
-    const [items, totalItems] = await prisma.$transaction([
+    const [items, totalItems] = await Promise.all([
       prisma.user.findMany({
         orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
         skip: pagination.skip,
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hash(input.data.password, 12);
-    const user = await prisma.$transaction(async (transaction) => {
+    const user = await runInTransaction(async (transaction) => {
       const created = await transaction.user.create({
         data: {
           name: input.data.name,

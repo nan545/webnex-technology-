@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac } from "node:crypto";
 import { prisma } from "@/server/db";
+import { runAsDatabaseActor } from "@/server/db-context";
 
 const windowMilliseconds = 15 * 60 * 1000;
 const requestLimit = 5;
@@ -12,7 +13,11 @@ export class RateLimitConfigurationError extends Error {
   }
 }
 
-export async function consumeEnquiryRateLimit(request: Request) {
+export function consumeEnquiryRateLimit(request: Request) {
+  return runAsDatabaseActor({ kind: "intake" }, () => countEnquiryRequest(request));
+}
+
+async function countEnquiryRequest(request: Request) {
   const secret = process.env.RATE_LIMIT_SECRET;
   if (!secret || secret.length < 32) {
     throw new RateLimitConfigurationError();

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const noteSchema = z.object({ body: z.string().trim().min(1).max(4000) });
@@ -27,7 +27,7 @@ export async function POST(
   if (!input.success) return apiError(422, "VALIDATION_FAILED", "Enter an internal note of 1–4,000 characters.");
 
   try {
-    const note = await prisma.$transaction(async (transaction) => {
+    const note = await runInTransaction(async (transaction) => {
       const enquiry = await transaction.enquiry.findUnique({
         where: { id },
         select: { id: true, reference: true },

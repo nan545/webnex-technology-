@@ -66,7 +66,7 @@ export default async function EnquiriesPage({
       : {}),
   };
 
-  const [enquiries, totalItems, services, assignees] = await prisma.$transaction([
+  const [enquiries, totalItems, services, assignees] = await Promise.all([
     prisma.enquiry.findMany({
       where,
       orderBy: { createdAt: "desc" },

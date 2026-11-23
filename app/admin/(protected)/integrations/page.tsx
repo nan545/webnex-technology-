@@ -9,7 +9,7 @@ export const metadata = { title: "Integrations | WEBNEX Admin" };
 export default async function IntegrationsPage() {
   await requireAdminPage("settings:manage");
   const configuration = getSendGridConfiguration();
-  const [grouped, recent] = await prisma.$transaction([
+  const [grouped, recent] = await Promise.all([
     prisma.notificationOutbox.groupBy({
       by: ["status"],
       orderBy: { status: "asc" },

@@ -12,6 +12,8 @@ type Project = {
   status: string;
   assignments?: {
     userId: string;
+    acceptedAt?: string | Date | null;
+    declinedAt?: string | Date | null;
     user: {
       name: string | null;
       email: string;
@@ -94,6 +96,26 @@ export function WorkProjectManagement({ projects, users, canManage }: {
     }
   }
 
+  async function acknowledge(projectId: string, decision: "ACCEPTED" | "DECLINED") {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/v1/work-projects/${projectId}/assignment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      setMessage(decision === "ACCEPTED" ? "Assignment accepted." : "Assignment declined.");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The assignment could not be updated.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return <div className="space-y-6">
     <header>
       <p className="text-sm font-semibold text-blue-700">Private workspace</p>
@@ -107,6 +129,21 @@ export function WorkProjectManagement({ projects, users, canManage }: {
           {canManage ? <button className="button-secondary" disabled={busy} onClick={() => edit(project)} type="button">Edit {project.title}</button> : null}
         </div>
         <p className="mt-3 whitespace-pre-wrap text-sm">{project.description}</p>
+        {!canManage ? <div className="mt-4 border-t border-border pt-4">
+          {project.assignments?.[0]?.acceptedAt ? (
+            <p className="text-sm text-green-800">Assignment accepted.</p>
+          ) : project.assignments?.[0]?.declinedAt ? (
+            <p className="text-sm text-amber-800">Assignment declined. Contact the project manager if this is incorrect.</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted">Do you accept responsibility for this work project?</p>
+              <div className="flex flex-wrap gap-3">
+                <button className="button-primary" disabled={busy} onClick={() => void acknowledge(project.id, "ACCEPTED")} type="button">Accept assignment</button>
+                <button className="button-secondary" disabled={busy} onClick={() => void acknowledge(project.id, "DECLINED")} type="button">Decline assignment</button>
+              </div>
+            </div>
+          )}
+        </div> : null}
         {canManage ? <div className="mt-4 text-sm">
           <p className="font-medium">Assigned accounts</p>
           {project.assignments?.length ? <ul className="mt-2 space-y-1">
@@ -119,6 +156,9 @@ export function WorkProjectManagement({ projects, users, canManage }: {
               <span className="block text-xs text-muted">
                 WhatsApp: {assignment.notification?.whatsappStatus.toLowerCase() ?? "not queued"}
                 {assignment.notification?.whatsappLastError ? ` — ${assignment.notification.whatsappLastError}` : ""}
+              </span>
+              <span className="block text-xs text-muted">
+                Assignment: {assignment.acceptedAt ? "accepted" : assignment.declinedAt ? "declined" : "pending"}
               </span>
             </li>)}
           </ul> : <p className="mt-1 text-muted">No one assigned.</p>}

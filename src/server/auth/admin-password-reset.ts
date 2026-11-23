@@ -1,7 +1,7 @@
 import "server-only";
 import { hash } from "bcryptjs";
 import { z } from "zod";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 
 export const adminNewPasswordSchema = z.string().min(12).max(72)
   .refine((value) => Buffer.byteLength(value, "utf8") <= 72);
@@ -16,7 +16,7 @@ export async function resetOtherAdminPassword(actorId: string, userId: string, p
     throw new Error("Invalid administrator password reset.");
   }
   const passwordHash = await hash(password, 12);
-  return prisma.$transaction(async (transaction) => {
+  return runInTransaction(async (transaction) => {
     const result = await transaction.user.updateMany({
       where: { id: userId, isActive: true, roles: { some: {} } },
       data: {
@@ -45,7 +45,7 @@ export async function resetAdminPassword(input: { email: string; password: strin
   if (!parsed.success) throw new Error("Enter a valid email and a password of 12-72 UTF-8 bytes.");
 
   const passwordHash = await hash(parsed.data.password, 12);
-  await prisma.$transaction(async (transaction) => {
+  await runInTransaction(async (transaction) => {
     const users = await transaction.user.findMany({
       where: {
         email: { equals: parsed.data.email, mode: "insensitive" },

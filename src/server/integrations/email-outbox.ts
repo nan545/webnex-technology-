@@ -1,6 +1,7 @@
 import "server-only";
 import { NotificationStatus } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
+import { runAsDatabaseActor } from "@/server/db-context";
 import {
   escapeEmailHtml,
   getSendGridConfiguration,
@@ -11,7 +12,11 @@ import {
 
 const maximumAttempts = 5;
 
-export async function dispatchEmailOutbox(batchSize = 20) {
+export function dispatchEmailOutbox(batchSize = 20) {
+  return runAsDatabaseActor({ kind: "system" }, () => dispatchPending(batchSize));
+}
+
+async function dispatchPending(batchSize: number) {
   const configuration = getSendGridConfiguration();
   if (!configuration) {
     throw new Error(

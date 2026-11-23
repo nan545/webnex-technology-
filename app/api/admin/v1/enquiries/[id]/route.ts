@@ -2,7 +2,7 @@ import { EnquiryStatus, Prisma } from "@/generated/prisma/client";
 import { z } from "zod";
 import { apiError, apiSuccess, handleApiFailure } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 const idSchema = z.string().uuid();
@@ -167,7 +167,7 @@ export async function PATCH(
       ...(followUpChanged ? ["ENQUIRY_FOLLOW_UP_CHANGED"] : []),
     ];
 
-    const updated = await prisma.$transaction(async (transaction) => {
+    const updated = await runInTransaction(async (transaction) => {
       const result = await transaction.enquiry.update({
         where: { id },
         data,

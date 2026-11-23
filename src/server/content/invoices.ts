@@ -1,7 +1,16 @@
-import type { Prisma } from "@/generated/prisma/client";
+type InvoiceCounterClient = {
+  invoiceNumberCounter: {
+    upsert(args: {
+      where: { year: number };
+      create: { year: number; lastNumber: number };
+      update: { lastNumber: { increment: number } };
+      select: { lastNumber: true };
+    }): Promise<{ lastNumber: number }>;
+  };
+};
 
 export async function allocateInvoiceNumber(
-  transaction: Pick<Prisma.TransactionClient, "invoiceNumberCounter">,
+  transaction: InvoiceCounterClient,
   year: number,
 ) {
   const counter = await transaction.invoiceNumberCounter.upsert({

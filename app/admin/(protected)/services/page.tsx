@@ -29,7 +29,7 @@ export default async function AdminServicesPage({
         ],
       }
     : {};
-  const [records, totalItems] = await prisma.$transaction([
+  const [records, totalItems] = await Promise.all([
     prisma.service.findMany({
       where,
       orderBy: [{ updatedAt: "desc" }, { title: "asc" }],

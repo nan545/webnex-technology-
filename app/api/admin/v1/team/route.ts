@@ -2,7 +2,7 @@ import { ContentStatus, Prisma } from "@/generated/prisma/client";
 import { teamMemberCreateSchema } from "@/lib/validation/team-member";
 import { apiError, apiSuccess, handleApiFailure, parsePagination } from "@/server/api/response";
 import { authorizeAdmin } from "@/server/auth/admin-api";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 import { rejectCrossOriginMutation } from "@/server/security/same-origin";
 
 export async function GET(request: Request) {
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     : {};
 
   try {
-    const [items, totalItems] = await prisma.$transaction([
+    const [items, totalItems] = await Promise.all([
       prisma.teamMember.findMany({
         where,
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   if (!input.success) return apiError(422, "VALIDATION_FAILED", "Review the team member details.");
 
   try {
-    const member = await prisma.$transaction(async (transaction) => {
+    const member = await runInTransaction(async (transaction) => {
       const slug = await createUniqueSlug(transaction, input.data.name);
       const created = await transaction.teamMember.create({
         data: {

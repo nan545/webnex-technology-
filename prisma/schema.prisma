@@ -381,6 +381,8 @@ model WorkProjectAssignment {
   projectId String   @db.Uuid
   userId    String   @db.Uuid
   createdAt DateTime @default(now())
+  acceptedAt DateTime?
+  declinedAt DateTime?
 
   project      WorkProject               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)

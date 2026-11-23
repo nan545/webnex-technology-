@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac } from "node:crypto";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 
 const windowMilliseconds = 15 * 60 * 1000;
 
@@ -20,7 +20,7 @@ export async function consumeLoginRateLimit(email: string, address: string) {
   const bucketStart = new Date(
     Math.floor(now.getTime() / windowMilliseconds) * windowMilliseconds,
   );
-  const [accountBucket, addressBucket] = await prisma.$transaction(async (transaction) => {
+  const [accountBucket, addressBucket] = await runInTransaction(async (transaction) => {
     await transaction.rateLimitBucket.deleteMany({
       where: {
         identifier: { in: [accountIdentifier, addressIdentifier] },

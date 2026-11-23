@@ -18,6 +18,7 @@ const activeNavigation = [
   { href: "/admin/publications/projects", label: "Projects", permission: "projects:manage" },
   { href: "/admin/publications/insights", label: "Insights", permission: "blog:manage" },
   { href: "/admin/team", label: "Team Members", permission: "team:view" },
+  { href: "/admin/media", label: "Media library", permission: "media:manage" },
   { href: "/admin/enquiries", label: "Enquiries", permission: "enquiries:read" },
   { href: "/admin/users", label: "Users and roles", permission: "users:manage" },
   { href: "/admin/audit-logs", label: "Audit logs", permission: "audit:read" },
@@ -27,7 +28,6 @@ const activeNavigation = [
 const navigationGroups = [
   { permission: "projects:manage", labels: ["Case studies", "Industries"] },
   { permission: "testimonials:manage", labels: ["Testimonials"] },
-  { permission: "media:manage", labels: ["Media library"] },
 ] as const;
 
 export function AdminShell({

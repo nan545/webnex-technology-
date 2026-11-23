@@ -7,11 +7,54 @@ export async function listWorkProjects(admin: AdminContext) {
   const canManage = admin.permissions.has("projects:manage");
   const select = { id: true, title: true, description: true, status: true } as const;
   if (!canManage) {
-    return prisma.workProject.findMany({
+    const projects = await prisma.workProject.findMany({
       where: { assignments: { some: { userId: admin.id } } },
       orderBy: { updatedAt: "desc" },
-      select,
+      select: {
+        ...select,
+        assignments: {
+          where: { userId: admin.id },
+          select: {
+            userId: true,
+            acceptedAt: true,
+            declinedAt: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+                isActive: true,
+                phone: true,
+                smsAlertsEnabled: true,
+                whatsappAlertsEnabled: true,
+              },
+            },
+            notification: {
+              select: {
+                status: true,
+                smsStatus: true,
+                smsLastError: true,
+                whatsappStatus: true,
+                whatsappLastError: true,
+              },
+            },
+          },
+        },
+      },
     });
+    return projects.map(({ assignments, ...project }) => ({
+      ...project,
+      assignments: assignments.map(({ user, ...assignment }) => ({
+        ...assignment,
+        user: {
+          name: user.name,
+          email: user.email,
+          isActive: user.isActive,
+          hasPhone: Boolean(user.phone),
+          smsAlertsEnabled: user.smsAlertsEnabled,
+          whatsappAlertsEnabled: user.whatsappAlertsEnabled,
+        },
+      })),
+    }));
   }
   const projects = await prisma.workProject.findMany({
     orderBy: { updatedAt: "desc" },
@@ -20,6 +63,8 @@ export async function listWorkProjects(admin: AdminContext) {
       assignments: {
         select: {
           userId: true,
+          acceptedAt: true,
+          declinedAt: true,
           user: {
             select: {
               name: true,

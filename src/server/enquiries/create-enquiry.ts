@@ -1,7 +1,8 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { ContactPreference, Prisma } from "@/generated/prisma/client";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
+import { runAsDatabaseActor } from "@/server/db-context";
 import type { EnquiryInput } from "@/lib/validation/enquiries";
 
 function createReference() {
@@ -10,7 +11,13 @@ function createReference() {
   return `WNX-${date}-${suffix}`;
 }
 
-export async function createEnquiry(input: EnquiryInput, idempotencyKey: string) {
+export function createEnquiry(input: EnquiryInput, idempotencyKey: string) {
+  return runAsDatabaseActor({ kind: "intake", idempotencyKey }, () =>
+    insertEnquiry(input, idempotencyKey),
+  );
+}
+
+async function insertEnquiry(input: EnquiryInput, idempotencyKey: string) {
   const existing = await prisma.enquiry.findUnique({
     where: { idempotencyKey },
     select: { reference: true, createdAt: true },
@@ -24,7 +31,7 @@ export async function createEnquiry(input: EnquiryInput, idempotencyKey: string)
   };
 
   try {
-    const enquiry = await prisma.$transaction(async (transaction) => {
+    const enquiry = await runInTransaction(async (transaction) => {
       const created = await transaction.enquiry.create({
         data: {
           reference: createReference(),

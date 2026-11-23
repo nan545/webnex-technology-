@@ -1,6 +1,6 @@
 import "server-only";
 import { publicationContentSchema, type PublicationInput, type PublicationKind } from "@/lib/validation/publication";
-import { prisma } from "@/server/db";
+import { prisma, runInTransaction } from "@/server/db";
 
 export function publicationPermission(kind: PublicationKind) {
   return kind === "projects" ? "projects:manage" : "blog:manage";
@@ -30,7 +30,7 @@ export async function listAdminPublications(kind: PublicationKind) {
 }
 
 export async function savePublication(kind: PublicationKind, id: string | null, input: PublicationInput, actorId: string, canPublish: boolean) {
-  return prisma.$transaction(async (transaction) => {
+  return runInTransaction(async (transaction) => {
     await transaction.$executeRaw`SELECT pg_advisory_xact_lock(72340172838076674)`;
     const existing = id
       ? kind === "projects"

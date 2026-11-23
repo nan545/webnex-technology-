@@ -27,7 +27,7 @@ export default async function AuditLogsPage({
       }
     : {};
 
-  const [items, totalItems] = await prisma.$transaction([
+  const [items, totalItems] = await Promise.all([
     prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: "desc" },

@@ -11,6 +11,7 @@ import { PageHero } from "@/components/ui/page-hero";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { pageMetadata } from "@/lib/seo";
 import { readPublishedServiceForPage, readPublishedServicesForPage } from "@/server/content/services";
+import { getServiceImage } from "@/data/service-images";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export default async function ServiceDetailPage({
       <PageHero
         description={service.summary ?? content.introduction}
         eyebrow="Our services"
+        image={getServiceImage(service.slug)}
         title={service.title}
       />
       {content.introduction || content.problems.length ? (

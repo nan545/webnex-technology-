@@ -11,6 +11,8 @@ import { industries } from "@/data/industries";
 import { products } from "@/data/products";
 import { serviceDivisions } from "@/data/service-content";
 import { pageMetadata } from "@/lib/seo";
+import Image from "next/image";
+import { divisionImages } from "@/data/service-images";
 
 export const dynamic = "force-dynamic";
 
@@ -88,14 +90,26 @@ export default function Home() {
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {serviceDivisions.map((division, index) => {
               const Icon = divisionIcons[index] ?? ShieldCheck;
+              const image = divisionImages[division.title];
               return (
-                <article className="border border-border bg-white p-6 sm:p-7" key={division.title}>
-                  <Icon aria-hidden="true" className="text-blue-700" size={25} />
-                  <h2 className="mt-5 text-lg font-semibold text-navy-950">{division.title}</h2>
-                  <p className="mt-3 text-sm leading-6 text-muted">{division.description}</p>
-                  <Link className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-blue-700" href="/services">
-                    Explore division <ArrowRight aria-hidden="true" size={15} />
-                  </Link>
+                <article className="group border border-border bg-white" key={division.title}>
+                  <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
+                    <Image
+                      alt={image.alt}
+                      className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      src={image.src}
+                    />
+                  </div>
+                  <div className="p-6 sm:p-7">
+                    <Icon aria-hidden="true" className="text-blue-700" size={25} />
+                    <h2 className="mt-5 text-lg font-semibold text-navy-950">{division.title}</h2>
+                    <p className="mt-3 text-sm leading-6 text-muted">{division.description}</p>
+                    <Link className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-blue-700" href="/services">
+                      Explore division <ArrowRight aria-hidden="true" size={15} />
+                    </Link>
+                  </div>
                 </article>
               );
             })}

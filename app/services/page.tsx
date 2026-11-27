@@ -7,6 +7,8 @@ import { pageMetadata } from "@/lib/seo";
 import { serviceContent, serviceDivisions } from "@/data/service-content";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { divisionImages } from "@/data/service-images";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +28,24 @@ export default function ServicesPage() {
       />
       {serviceDivisions.map((division, divisionIndex) => {
         const services = serviceContent.filter((service) => service.division === division.title);
+        const image = divisionImages[division.title];
         return (
           <section className={divisionIndex % 2 ? "bg-slate-50 py-16 sm:py-20" : "py-16 sm:py-20"} key={division.title}>
             <Container>
               <SectionHeading eyebrow={`Division ${divisionIndex + 1}`} description={division.description} title={division.title} />
+              <div className="relative mt-8 aspect-[16/5] min-h-52 overflow-hidden bg-slate-100">
+                <Image
+                  alt={image.alt}
+                  className="object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 1280px"
+                  src={image.src}
+                />
+                <div className="absolute inset-0 bg-navy-950/10" />
+              </div>
               <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {services.map((service) => (
-                  <article className="group border border-border bg-white p-6" key={service.slug}>
+                  <article className="relative border border-border bg-white p-6" key={service.slug}>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Service</p>
                     <h3 className="mt-3 text-lg font-semibold text-navy-950">
                       <Link className="after:absolute after:inset-0" href={`/services/${service.slug}`}>{service.title}</Link>

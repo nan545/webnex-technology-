@@ -1,34 +1,22 @@
+import Image from "next/image";
 import { Compass, PenTool, Wrench } from "lucide-react";
 import { BrandLogo } from "@/components/layout/brand-logo";
 
 export function HeroIllustration() {
   return (
     <div
-      aria-hidden="true"
-      className="relative mx-auto hidden aspect-square w-full max-w-[500px] items-center justify-center lg:flex"
+      className="relative mx-auto hidden aspect-[5/4] w-full max-w-[560px] lg:block"
     >
-      <div className="absolute inset-3 bg-slate-50" />
-      <div className="absolute inset-8 border border-blue-100" />
-      <div className="absolute inset-16 border border-border" />
-      <div className="absolute inset-28 rounded-full border border-dashed border-blue-100" />
-      <svg
-        aria-hidden="true"
-        className="absolute inset-0 size-full"
-        fill="none"
-        viewBox="0 0 500 500"
-      >
-        <path
-          d="M250 166V116h119v-18M166 250H99v91m235-91h67v91"
-          stroke="#A8C8E8"
-          strokeDasharray="4 6"
-          strokeWidth="1.5"
-        />
-        <circle cx="369" cy="98" r="4" fill="#2878B9" />
-        <circle cx="99" cy="341" r="4" fill="#2878B9" />
-        <circle cx="401" cy="341" r="4" fill="#2878B9" />
-      </svg>
-
-      <div className="relative z-10 grid size-36 place-items-center border border-blue-700 bg-white shadow-[0_20px_70px_rgba(11,31,58,0.12)]">
+      <Image
+        alt="Technology professionals collaborating around a digital workspace"
+        className="object-cover"
+        fill
+        priority
+        sizes="(max-width: 1024px) 0px, 560px"
+        src="/images/hero-team.webp"
+      />
+      <div className="absolute inset-0 bg-navy-950/5" />
+      <div className="absolute left-5 top-5 z-10 grid size-28 place-items-center border border-white/70 bg-white/95 shadow-[0_20px_70px_rgba(11,31,58,0.16)]">
         <BrandLogo className="w-28" />
       </div>
 

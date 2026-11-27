@@ -15,8 +15,8 @@ export function Footer({ links }: { links: NavigationConfiguration["footer"] }) 
             <BrandLogo />
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-6 text-muted">
-            {siteConfig.tagline} Software engineering and technology solutions
-            for businesses in Ghana.
+            {siteConfig.tagline} Digital solutions, enterprise software,
+            cloud infrastructure, AI-powered automation, and technology consulting.
           </p>
         </div>
         <div>

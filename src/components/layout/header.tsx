@@ -65,7 +65,7 @@ export function Header({ links }: { links: NavigationConfiguration["header"] }) 
             </button>
             {servicesOpen ? (
               <div className="absolute left-0 top-full mt-2 w-72 border border-border bg-white p-2 shadow-lg">
-                {services.map((service) => (
+                {services.slice(0, 8).map((service) => (
                   <Link
                     className="block px-3 py-2.5 text-sm text-navy-800 hover:bg-blue-100 hover:text-blue-700"
                     href={`/services/${service.slug}`}
@@ -99,7 +99,7 @@ export function Header({ links }: { links: NavigationConfiguration["header"] }) 
 
         <div className="hidden lg:block">
           <Link className="button-primary" href="/contact">
-            Start a Project
+            Request a Consultation
           </Link>
         </div>
 
@@ -147,7 +147,7 @@ export function Header({ links }: { links: NavigationConfiguration["header"] }) 
                 >
                   All services
                 </Link>
-                {services.map((service) => (
+                {services.slice(0, 8).map((service) => (
                   <Link
                     className="block py-2 text-sm text-muted"
                     href={`/services/${service.slug}`}
@@ -176,7 +176,7 @@ export function Header({ links }: { links: NavigationConfiguration["header"] }) 
               href="/contact"
               onClick={closeMenus}
             >
-              Start a Project
+              Request a Consultation
             </Link>
           </div>
         </nav>

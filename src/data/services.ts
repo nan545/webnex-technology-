@@ -14,8 +14,13 @@ const icons: Record<string, LucideIcon> = {
 };
 
 export const services: Service[] = serviceContent.map((service) => {
-  const icon = icons[service.slug];
-  if (!icon) throw new Error(`Missing service icon for ${service.slug}.`);
+  const icon = icons[service.slug] ?? (
+    service.division === "Digital Solutions" ? Code2
+    : service.division === "Software and Applications" ? Layers3
+    : service.division === "Cloud and Infrastructure" ? Cloud
+    : service.division === "AI and Business Automation" ? Bot
+    : Lightbulb
+  );
   return { ...service, icon };
 });
 

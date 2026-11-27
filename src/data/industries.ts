@@ -53,6 +53,38 @@ export const industries: Industry[] = [
     icon: Hotel,
   },
   {
+    slug: "restaurants",
+    title: "Restaurants",
+    introduction: "Restaurants can use coordinated digital systems to improve customer information, ordering, inventory, and operational visibility.",
+    challenges: [
+      "Manual ordering or inventory processes.",
+      "Unclear customer communication.",
+      "Reporting that depends on separate records.",
+    ],
+    solutions: [
+      "Website and ordering experiences",
+      "Inventory and operational applications",
+      "Reporting and business workflow support",
+    ],
+    icon: Hotel,
+  },
+  {
+    slug: "smes-startups",
+    title: "SMEs and startups",
+    introduction: "Smaller organizations need practical technology that fits current resources while remaining ready for growth.",
+    challenges: [
+      "Limited time for repeated administration.",
+      "Unclear priorities for technology investment.",
+      "Systems that need to support change as the business grows.",
+    ],
+    solutions: [
+      "Focused business websites",
+      "Custom operational applications",
+      "Cloud and automation planning",
+    ],
+    icon: BriefcaseBusiness,
+  },
+  {
     slug: "healthcare",
     title: "Healthcare",
     introduction:
@@ -117,6 +149,22 @@ export const industries: Industry[] = [
       "Clear corporate websites and service journeys",
       "Internal business workflow applications",
       "Security-conscious technical planning",
+    ],
+    icon: BriefcaseBusiness,
+  },
+  {
+    slug: "professional-services",
+    title: "Professional services",
+    introduction: "Professional service organizations need clear digital experiences and controlled workflows for client and information management.",
+    challenges: [
+      "Complex services that are difficult to explain online.",
+      "Repeated client intake and document workflows.",
+      "Security and privacy requirements.",
+    ],
+    solutions: [
+      "Corporate websites and service journeys",
+      "Internal workflow applications",
+      "Security-conscious planning",
     ],
     icon: BriefcaseBusiness,
   },

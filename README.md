@@ -2,7 +2,7 @@
 
 Phase 1 foundation, Phase 2 public website, Phase 3 API foundation, a partial Phase 4 admin platform, the first Phase 5 CMS vertical slice, and a partial Phase 6 CRM workflow for WEBNEX Technologies.
 
-**Brand:** Engineering Digital Possibilities.  
+**Brand:** Building Intelligence. Enabling Progress.
 **Initial market:** Ghana, with international expansion planned.  
 **Language:** English.
 

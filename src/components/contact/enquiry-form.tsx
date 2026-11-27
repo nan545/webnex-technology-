@@ -31,20 +31,54 @@ const initialValues: FormValues = {
 
 const fields = {
   web: [
-    { value: "web-development", label: "Web Development" },
-    { value: "custom-software-development", label: "Custom Software Development" },
-    { value: "mobile-application-development", label: "Mobile Application Development" },
-    { value: "ai-and-business-automation", label: "AI and Business Automation" },
-    { value: "cloud-and-infrastructure-solutions", label: "Cloud and Infrastructure Solutions" },
-    { value: "ui-ux-design", label: "UI/UX Design" },
-    { value: "technology-consulting", label: "Technology Consulting" },
+    { value: "web-development", label: "Business website design and development" },
+    { value: "corporate-websites", label: "Corporate websites" },
+    { value: "ecommerce-development", label: "Ecommerce development" },
+    { value: "landing-pages", label: "Landing pages" },
+    { value: "website-redesign", label: "Website redesign" },
+    { value: "ui-ux-design", label: "UI/UX design" },
+    { value: "brand-identity-digital-design", label: "Brand identity and digital design" },
+    { value: "custom-software-development", label: "Custom business software" },
+    { value: "inventory-management-systems", label: "Inventory management systems" },
+    { value: "point-of-sale-systems", label: "Point-of-sale systems" },
+    { value: "school-management-systems", label: "School management systems" },
+    { value: "hotel-management-systems", label: "Hotel management systems" },
+    { value: "web-application-development", label: "Web application development" },
+    { value: "mobile-application-development", label: "Android and iOS application development" },
+    { value: "api-development-integrations", label: "API development and integrations" },
+    { value: "cloud-and-infrastructure-solutions", label: "Website deployment" },
+    { value: "vps-config-management", label: "VPS configuration and management" },
+    { value: "managed-hosting", label: "Managed hosting" },
+    { value: "website-maintenance", label: "Website maintenance" },
+    { value: "cloud-migration", label: "Cloud migration" },
+    { value: "domain-dns-management", label: "Domain and DNS management" },
+    { value: "backup-infrastructure-monitoring", label: "Backup and infrastructure monitoring" },
+    { value: "ai-and-business-automation", label: "AI customer support solutions" },
+    { value: "business-workflow-automation", label: "Business workflow automation" },
+    { value: "document-processing-automation", label: "Document processing automation" },
+    { value: "automated-reporting", label: "Automated reporting" },
+    { value: "ai-integrations", label: "AI integrations" },
+    { value: "business-intelligence", label: "Business intelligence solutions" },
+    { value: "technology-consulting", label: "Technology consulting" },
+    { value: "it-infrastructure-setup", label: "IT infrastructure setup" },
+    { value: "website-security-assessments", label: "Website security assessments" },
+    { value: "backup-recovery-planning", label: "Backup and recovery planning" },
+    { value: "technical-support", label: "Technical support" },
+    { value: "digital-transformation-consulting", label: "Digital transformation consulting" },
+    { value: "stockflow", label: "StockFlow — business inventory and sales software" },
+    { value: "stayflex", label: "STAYFLEX — hotel management software" },
     { value: "other", label: "Other" },
   ],
   contacts: ["Email", "Phone", "Either"],
 };
 
-export function EnquiryForm() {
-  const [values, setValues] = useState(initialValues);
+export function EnquiryForm({ initialInterest }: { initialInterest?: string } = {}) {
+  const [values, setValues] = useState({
+    ...initialValues,
+    service: initialInterest === "stockflow" || initialInterest === "stayflex"
+      ? initialInterest
+      : "",
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormValues, string>>>({});
   const [status, setStatus] = useState<FormStatus>("idle");
   const [message, setMessage] = useState("");

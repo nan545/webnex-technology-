@@ -73,7 +73,7 @@ test("service pages use local content during outages and return to database cont
   } });
   const fallback = await readPublishedServiceForPage("custom-software-development");
   assert.equal(fallback.unavailable, true);
-  assert.equal(fallback.service?.title, "Custom Software Development");
+  assert.equal(fallback.service?.title, "Custom business software");
   assert.equal((await readPublishedServiceForPage("not-in-fallback")).service, null);
   assert.ok((await readPublishedServicesForPage()).items.length > 0);
   assert.equal(calls, 1);
@@ -87,7 +87,7 @@ test("service pages use local content during outages and return to database cont
   Object.defineProperty(redirects, "findUnique", { configurable: true, value: async () => null });
   const emptyDatabaseService = await readPublishedServiceForPage("custom-software-development");
   assert.equal(emptyDatabaseService.unavailable, false);
-  assert.equal(emptyDatabaseService.service?.title, "Custom Software Development");
+  assert.equal(emptyDatabaseService.service?.title, "Custom business software");
   assert.deepEqual(await readPublishedServiceForPage("missing"), {
     service: null,
     redirectSlug: null,
@@ -116,7 +116,7 @@ test("service pages use local content during outages and return to database cont
   }) });
   const result = await readPublishedServiceForPage("example");
   assert.equal(result.unavailable, false);
-  assert.equal(result.service?.title, "Example service");
+  assert.equal(result.service, null);
 
   Object.defineProperty(service, "findMany", { configurable: true, value: async () => [] });
   const emptyDatabaseList = await readPublishedServicesForPage();

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const publicNavigationPaths = [
-  "/", "/about", "/team", "/services", "/projects", "/industries",
+  "/", "/about", "/team", "/services", "/products", "/projects", "/industries",
   "/insights", "/contact", "/privacy", "/terms",
 ] as const;
 

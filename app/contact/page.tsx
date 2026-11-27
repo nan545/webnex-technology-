@@ -13,8 +13,13 @@ export const metadata: Metadata = pageMetadata(
   "/contact",
 );
 
-export default async function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ interest?: string }>;
+}) {
   const phone = await readContactPhone();
+  const { interest } = await searchParams;
   return (
     <>
       <PageHero
@@ -72,7 +77,7 @@ export default async function ContactPage() {
               passwords, payment information, or other sensitive data.
             </p>
             <div className="mt-7">
-              <EnquiryForm />
+              <EnquiryForm initialInterest={interest} />
             </div>
           </div>
         </Container>

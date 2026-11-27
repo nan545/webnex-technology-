@@ -12,10 +12,17 @@ export async function listPublishedServicesForWebsite() {
     select: { id: true, slug: true, title: true, summary: true, content: true, seoTitle: true, seoDescription: true },
   });
   if (services.length === 0) return fallbackServices;
-  return services.map((service) => ({
-    ...service,
-    content: parseServiceContent(service.id, service.content),
-  }));
+  const databaseBySlug = new Map(
+    services.map((service) => [service.slug, service]),
+  );
+  return fallbackServices.map((fallback) => {
+    const published = databaseBySlug.get(fallback.slug);
+    if (!published) return fallback;
+    return {
+      ...published,
+      content: parseServiceContent(published.id, published.content),
+    };
+  });
 }
 
 export async function readPublishedServicesForPage() {
@@ -41,7 +48,13 @@ export async function getPublishedServiceForWebsite(slug: string) {
     where: { slug, status: ContentStatus.PUBLISHED, publishedAt: { lte: new Date() } },
     select: { id: true, slug: true, title: true, summary: true, content: true, seoTitle: true, seoDescription: true },
   });
-  if (service) return { service: { ...service, content: parseServiceContent(service.id, service.content) }, redirectSlug: null };
+  if (service) {
+    const fallback = fallbackServices.find((item) => item.slug === slug);
+    if (fallback) {
+      return { service: { ...service, content: parseServiceContent(service.id, service.content) }, redirectSlug: null };
+    }
+    return { service: null, redirectSlug: null };
+  }
 
   const oldSlug = await prisma.serviceRedirect.findUnique({
     where: { sourceSlug: slug },

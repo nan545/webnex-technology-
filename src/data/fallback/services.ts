@@ -13,8 +13,13 @@ const icons: Record<string, CmsServiceContent["icon"]> = {
 };
 
 export const fallbackServices = serviceContent.map((service) => {
-  const icon = icons[service.slug];
-  if (!icon) throw new Error(`Missing fallback service icon for ${service.slug}.`);
+  const icon = icons[service.slug] ?? (
+    service.division === "Digital Solutions" ? "code"
+    : service.division === "Software and Applications" ? "layers"
+    : service.division === "Cloud and Infrastructure" ? "cloud"
+    : service.division === "AI and Business Automation" ? "bot"
+    : "lightbulb"
+  );
   return {
     id: service.slug,
     slug: service.slug,

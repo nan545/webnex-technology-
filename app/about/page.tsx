@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = pageMetadata(
   "About",
-  "Learn about WEBNEX Technologies and our approach to software engineering and digital solutions.",
+  "Learn about WEBNEX Technologies, a technology and innovation company delivering digital solutions, software, cloud infrastructure, AI automation, and consulting.",
   "/about",
 );
 
@@ -45,27 +45,27 @@ export default async function AboutPage() {
   return (
     <>
       <PageHero
-        description="A Ghana-first technology company with an international outlook, focused on software engineering and practical digital solutions."
+        description="A Ghana-first technology and innovation company with an international outlook."
         eyebrow="About WEBNEX"
-        title="Thoughtful engineering for a digital world."
+        title="Reliable technology for better ways of working."
       />
       <section className="py-16 sm:py-20">
         <Container className="grid gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20">
           <SectionHeading eyebrow="Our focus" title="Technology should solve a real problem." />
           <div className="space-y-5 leading-7 text-muted">
             <p>
-              WEBNEX Technologies works across software engineering, digital
-              product design, and technical planning. Our focus is helping
-              businesses make considered use of technology.
+              WEBNEX Technologies delivers digital solutions, enterprise
+              software, cloud infrastructure, AI-powered automation, and
+              technology consulting for businesses and institutions.
             </p>
             <p>
-              That begins with understanding the people involved, the
-              constraints that matter, and what a useful result would look
-              like. The solution should fit the need—not the other way around.
+              Our work begins with understanding the people involved, the
+              constraints that matter, and what a useful operating outcome
+              would look like. The solution should fit the need—not the other way around.
             </p>
             <p>
-              The company is starting in Ghana and is oriented toward serving
-              businesses locally and internationally.
+              The company&apos;s primary market is Ghana, with an international
+              outlook for organizations, partners, and technology projects.
             </p>
           </div>
         </Container>
@@ -96,7 +96,7 @@ export default async function AboutPage() {
               Our purpose
             </p>
             <h2 className="mt-4 text-2xl font-semibold text-navy-950">
-              Engineering Digital Possibilities.
+              Building Intelligence. Enabling Progress.
             </h2>
             <p className="mt-3 leading-7 text-muted">
               The approved tagline reflects WEBNEX Technologies’ focus on
@@ -107,12 +107,13 @@ export default async function AboutPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
               Mission and vision
             </p>
-            <h2 className="mt-4 text-2xl font-semibold text-navy-950">
-              To be published after company approval.
-            </h2>
+            <h2 className="mt-4 text-2xl font-semibold text-navy-950">Mission</h2>
             <p className="mt-3 leading-7 text-muted">
-              Formal mission and vision statements have not yet been supplied.
-              We will publish them when WEBNEX confirms the wording.
+              Help businesses and institutions operate more efficiently through reliable and intelligent technology.
+            </p>
+            <h2 className="mt-6 text-2xl font-semibold text-navy-950">Vision</h2>
+            <p className="mt-3 leading-7 text-muted">
+              Enable organizations to adopt dependable, intelligent technology that strengthens how they operate and grow.
             </p>
           </div>
         </Container>

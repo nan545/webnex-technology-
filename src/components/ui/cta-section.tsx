@@ -11,7 +11,7 @@ export function CtaSection() {
             Let’s talk
           </p>
           <h2 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-            Have a project in mind?
+            Planning a digital initiative?
           </h2>
           <p className="mt-4 max-w-xl leading-7 text-slate-300">
             Let’s discuss how technology can help your business achieve more.
@@ -22,7 +22,7 @@ export function CtaSection() {
           href="/contact"
           variant="secondary"
         >
-          Start a Project <ArrowRight aria-hidden="true" size={16} />
+          Request a Consultation <ArrowRight aria-hidden="true" size={16} />
         </ButtonLink>
       </Container>
     </section>

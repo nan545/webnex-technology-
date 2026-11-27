@@ -48,6 +48,7 @@ export default async function AboutPage() {
         description="A Ghana-first technology and innovation company with an international outlook."
         eyebrow="About WEBNEX"
         title="Reliable technology for better ways of working."
+        image={{ src: "/images/consulting.webp", alt: "Technology consultants in a planning session" }}
       />
       <section className="py-16 sm:py-20">
         <Container className="grid gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20">

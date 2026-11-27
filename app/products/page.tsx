@@ -8,6 +8,7 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { CtaSection } from "@/components/ui/cta-section";
 import { products } from "@/data/products";
 import { pageMetadata } from "@/lib/seo";
+import Image from "next/image";
 
 export const metadata: Metadata = pageMetadata(
   "Products",
@@ -22,6 +23,7 @@ export default function ProductsPage() {
         eyebrow="Software products"
         title="Purpose-built software for everyday business operations."
         description="Explore our product portfolio for inventory, sales, and hospitality operations."
+        image={{ src: "/images/software.webp", alt: "Business team reviewing software workflows" }}
       />
       <section className="py-16 sm:py-20">
         <Container>
@@ -29,7 +31,17 @@ export default function ProductsPage() {
             {products.map((product) => {
               const Icon = product.slug === "stockflow" ? Boxes : Hotel;
               return (
-                <article className="border border-border bg-white p-7 sm:p-9" key={product.slug}>
+                <article className="overflow-hidden border border-border bg-white" key={product.slug}>
+                  <div className="relative aspect-[16/8]">
+                    <Image
+                      alt={product.slug === "stockflow" ? "Inventory and point-of-sale workspace" : "Modern hotel operations and hospitality"}
+                      className="object-cover"
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      src={product.slug === "stockflow" ? "/images/inventory.webp" : "/images/hotel.webp"}
+                    />
+                  </div>
+                  <div className="p-7 sm:p-9">
                   <span className="grid size-12 place-items-center bg-blue-100 text-blue-700">
                     <Icon aria-hidden="true" size={24} />
                   </span>
@@ -44,6 +56,7 @@ export default function ProductsPage() {
                   <ButtonLink className="mt-8" href={`/contact?interest=${product.slug}`}>
                     Enquire about {product.name} <ArrowRight aria-hidden="true" size={16} />
                   </ButtonLink>
+                  </div>
                 </article>
               );
             })}

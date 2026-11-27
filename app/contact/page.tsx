@@ -26,6 +26,7 @@ export default async function ContactPage({
         description="Share what you are planning, what you need to solve, and where you are in the process. We will publish direct contact details once they are confirmed."
         eyebrow="Contact"
         title="Let’s talk about what you want to build."
+        image={{ src: "/images/contact.webp", alt: "Professional conversation and project planning" }}
       />
       <section className="py-16 sm:py-20">
         <Container className="grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
